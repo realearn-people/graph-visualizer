@@ -562,6 +562,7 @@ input[type=range] {
             <div class="control">
               <div class="control-label">Max Edges</div>
               <select id="filter-limit" onchange="fetchGraph()">
+                <option value="999999" >All</option>
                 <option value="100">100</option>
                 <option value="200">200</option>
                 <option value="300" selected>300</option>
@@ -792,7 +793,13 @@ function initPos() {
   });
   ectrl={};
   transform={x:0,y:0,scale:1};
-  runSim(180);
+  // Skip simulation entirely if too many nodes
+  if (G.nodes.length > 300) {
+    simActive = false;
+    draw();
+  } else {
+    runSim(180);
+  }
 }
 
 // ── Force sim ─────────────────────────────────────────────────────────────
@@ -847,7 +854,7 @@ function getCtrl(idx,ps,pt) {
 }
 
 // ── Draw ──────────────────────────────────────────────────────────────────
-function draw() { cancelAnimationFrame(raf); raf=requestAnimationFrame(_draw); }
+function draw() { needsRedraw = true; }
 
 function _draw() {
   const cv=document.getElementById('graph-canvas');
@@ -1010,7 +1017,6 @@ function _draw() {
   });
 
   ctx.restore();
-  if (simActive) raf=requestAnimationFrame(_draw);
 }
 
 // ── World coords ──────────────────────────────────────────────────────────
@@ -1225,6 +1231,17 @@ function setLoading(on) {
   document.getElementById('loading').classList.toggle('show',on);
 }
 window.addEventListener('resize',()=>{ if(G.nodes.length) draw(); });
+// Dirty flag + render loop
+let needsRedraw = false;
+
+function renderLoop() {
+  if (needsRedraw) {
+    needsRedraw = false;
+    _draw();
+  }
+  requestAnimationFrame(renderLoop);
+}
+renderLoop();
 </script>
 </body>
 </html>

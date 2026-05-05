@@ -95,7 +95,7 @@ def get_graph(
     relation:  str   = "all",
     min_score: float = 0.0,
     search:    str   = "",
-    limit:     int   = 300,
+    limit:     int   = 999999,
 ):
     df = store["df"]
     if df is None:
@@ -116,17 +116,15 @@ def get_graph(
         )
         filtered = filtered[mask]
 
-    # ── FIX 1: Sample proportionally from each relation so all show up ────────
-    # Instead of sort-by-score + head(limit), sample evenly across relations
-    if relation == "all" and len(filtered) > limit:
-        rel_groups  = filtered.groupby("relation")
-        n_rels      = len(rel_groups)
-        per_rel     = max(1, limit // n_rels)
-        sampled     = pd.concat([
-            grp.sort_values("score", ascending=False).head(per_rel)
-            for _, grp in rel_groups
-        ])
-        filtered = sampled
+    if limit > 0 and len(filtered) > limit:
+        if relation == "all":
+            rel_groups = filtered.groupby("relation")
+            n_rels     = len(rel_groups)
+            per_rel    = max(1, limit // n_rels)
+            filtered   = pd.concat([
+                grp.sort_values("score", ascending=False).head(per_rel)
+                for _, grp in rel_groups
+            ])
     else:
         filtered = filtered.sort_values("score", ascending=False).head(limit)
 
