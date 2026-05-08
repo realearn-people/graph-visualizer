@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KGE Visualizer</title>
+<style>
+/* ── Imports ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Reset & Variables ────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #0e2f2f;
+  --bg1:          #0a1f1f;
+  --bg2:          #0d2828;
+  --bg3:          #133535;
+  --border:       rgba(152,240,200,.10);
+  --border2:      rgba(152,240,200,.20);
+  --text:         #f7f0df;
+  --text-dim:     #d6b04c;
+  --text-faint:   #8a8d8b;
+  --cyan:         #98f0c8;
+  --cyan-dim:     rgba(152,240,200,.15);
+  --red:          #ff6ec7;
+  --red-dim:      rgba(60,0,8,.3);
+  --amber:        #d6b04c;
+  --amber-dim:    rgba(214,176,76,.15);
+  --green:        #06d6a0;
+  --green-dim:    rgba(6,214,160,.12);
+  --contrary:     #ff6ec7;
+  --not-contrary: #98f0c8;
+  --support:      #cfff04;
+  --radius:       10px;
+  --font:         'Inter', sans-serif;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  height: 100vh;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.logo {
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.2px;
+}
+.header-status {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex; align-items: center; gap: 8px;
+}
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: background .3s;
+}
+.status-dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+.sidebar {
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Cards ────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.card-title {
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+
+/* ── Upload zone ──────────────────────────────────────────────────────── */
+.upload-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 20px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: rgba(255,255,255,.02);
+}
+.upload-zone:hover {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+}
+.upload-zone.loaded {
+  border-color: var(--green);
+  background: var(--green-dim);
+  border-style: solid;
+}
+.upload-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.upload-label strong { color: var(--text); display: block; margin-bottom: 3px; }
+#file-input { display: none; }
+
+/* ── Stat grid ────────────────────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.stat {
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+}
+.stat-val {
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cyan);
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.stat-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+/* ── Relation bars ────────────────────────────────────────────────────── */
+.rel-bar-wrap { display: flex; flex-direction: column; gap: 7px; }
+.rel-bar-row { display: flex; flex-direction: column; gap: 4px; }
+.rel-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.rel-name { color: var(--text); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-count { color: var(--text-dim); }
+.rel-track { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.rel-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+.control { display: flex; flex-direction: column; gap: 5px; }
+.control-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+select, input[type=text] {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .2s;
+  appearance: none;
+}
+select:focus, input[type=text]:focus { border-color: var(--cyan); }
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23d6b04c'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+/* ── Slider ───────────────────────────────────────────────────────────── */
+.slider-wrap { display: flex; flex-direction: column; gap: 5px; }
+.slider-header { display: flex; justify-content: space-between; align-items: center; }
+.slider-val { font-size: 11px; color: var(--cyan); }
+input[type=range] {
+  width: 100%;
+  accent-color: var(--cyan);
+  cursor: pointer;
+  height: 4px;
+}
+
+/* ── Legend ───────────────────────────────────────────────────────────── */
+.legend { display: flex; flex-direction: column; gap: 6px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); }
+.legend-line { width: 20px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+.legend-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Canvas area ──────────────────────────────────────────────────────── */
+.canvas-area {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  background: var(--bg);
+}
+.canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+}
+.canvas-title {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.tab-group {
+  display: flex;
+  gap: 4px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+}
+.tab {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all .2s;
+  user-select: none;
+}
+.tab:hover { color: var(--text); background: var(--bg3); }
+.tab.active { background: var(--bg3); color: var(--cyan); border: 1px solid var(--border2); }
+.toolbar-right { margin-left: auto; display: flex; gap: 6px; }
+.icon-btn {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+  user-select: none;
+}
+.icon-btn:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.count-badge {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+/* ── Tree controls ────────────────────────────────────────── */
+.tree-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  margin: -20px -20px 20px -20px;
+}
+.tree-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tree-control-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.tree-controls select {
+  width: auto;
+  min-width: 140px;
+}
+ 
+/* ── Tree cards ───────────────────────────────────────────── */
+.tree-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+.tree-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.tree-claim-badge {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg3);
+  border: 2px solid var(--cyan);
+  border-radius: 8px;
+  padding: 6px 16px;
+}
+.tree-stat-badge {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+.tree-stat-badge span { color: var(--cyan); font-weight: 600; }
+ 
+/* ── Tree layout ──────────────────────────────────────────── */
+.tree-scroll {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  align-items: flex-start;
+}
+.tree-body-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-width: 160px;
+}
+.tree-connector-down {
+  width: 2px;
+  height: 20px;
+  background: var(--border2);
+}
+.tree-connector-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 3px 0;
+  white-space: nowrap;
+}
+.tree-connector-label.support      { background:rgba(152,240,200,.12); color:var(--cyan); }
+.tree-connector-label.contrary     { background:rgba(255,110,199,.12); color:var(--contrary); }
+.tree-connector-label.not-contrary { background:rgba(152,240,200,.08); color:var(--not-contrary); }
+ 
+/* ── Node boxes ───────────────────────────────────────────── */
+.tree-node-box {
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 11px;
+  text-align: center;
+  max-width: 155px;
+  word-break: break-word;
+  border: 1.5px solid;
+  cursor: default;
+  transition: all .15s;
+  line-height: 1.4;
+}
+.tree-node-box:hover { filter: brightness(1.2); }
+.tree-node-box.claim    { border-color:var(--cyan);      color:var(--cyan);      background:rgba(152,240,200,.08); font-weight:700; font-size:13px; }
+.tree-node-box.body     { border-color:var(--amber);     color:var(--amber);     background:rgba(214,176,76,.08); }
+.tree-node-box.attacker-contrary     { border-color:var(--contrary); color:var(--contrary); background:rgba(255,110,199,.08); }
+.tree-node-box.attacker-not-contrary { border-color:var(--cyan);     color:var(--cyan);     background:rgba(152,240,200,.06); }
+.tree-node-box.attacker-support      { border-color:var(--amber);    color:var(--amber);    background:rgba(214,176,76,.06); }
+ 
+.tree-node-type {
+  font-size: 9px;
+  opacity: .6;
+  margin-top: 2px;
+  letter-spacing: .5px;
+}
+.tree-attackers-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  align-items: center;
+}
+ 
+/* ── Pagination ───────────────────────────────────────────── */
+.tree-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.tree-page-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--cyan);
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .2s;
+}
+.tree-page-btn:hover   { background: var(--cyan-dim); }
+.tree-page-btn.disabled { opacity: .3; pointer-events: none; }
+.tree-page-info { font-size: 11px; color: var(--text-dim); }
+ 
+/* ── Legend ───────────────────────────────────────────────── */
+.tree-legend-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  margin-left: auto;
+}
+.tree-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+}
+.tree-legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  border: 1.5px solid;
+  flex-shrink: 0;
+}
+ 
+/* ── Empty / loading ──────────────────────────────────────── */
+.tree-empty {
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+  padding: 60px 20px;
+  line-height: 2;
+}
+/* ── Graph canvas ─────────────────────────────────────────────────────── */
+.graph-wrap {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 30% 40%, rgba(152,240,200,.04) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 70%, rgba(214,176,76,.03) 0%, transparent 60%),
+              var(--bg);
+}
+#graph-canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#graph-canvas:active { cursor: grabbing; }
+/* ── Tree View ──────────────────────────────────────────────────── */
+.tree-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 0 12px;
+}
+.tree-node-box {
+  background: var(--bg2);
+  border: 1.5px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.tree-node-box:hover { border-color: var(--cyan); color: var(--cyan); }
+.tree-node-box.claim    { border-color: var(--text-dim); color: var(--text); font-weight:600; font-size:12px; }
+.tree-node-box.assumption { border-color: var(--cyan); color: var(--cyan); }
+.tree-node-box.negated  { border-color: var(--red); color: var(--red); }
+.tree-node-box.body     { border-color: var(--amber); color: var(--amber); }
+
+.tree-edge-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 4px 0;
+  z-index: 2;
+}
+.tree-edge-label.contrary     { background: rgba(255,110,199,.15); color: var(--contrary); }
+.tree-edge-label.not-contrary { background: rgba(152,240,200,.10); color: var(--cyan); }
+
+.tree-level {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  position: relative;
+}
+.tree-connector-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.tree-line {
+  width: 1.5px;
+  background: var(--border2);
+  flex: 1;
+  min-height: 12px;
+}
+.tree-children {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin-top: 0;
+}
+/* Horizontal line connecting siblings */
+.tree-children::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 1.5px;
+  background: var(--border2);
+  width: calc(100% - 60px);
+}
+
+.tree-search-wrap {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+.tree-search-wrap input {
+  flex: 1;
+  max-width: 320px;
+}
+.tree-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--cyan);
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .2s;
+}
+.tree-btn:hover { background: var(--cyan-dim); }
+
+.tree-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  font-size: 11px;
+}
+.tree-legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.tree-legend-dot  { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid; }
+/* ── Tooltip ──────────────────────────────────────────────────────────── */
+.tooltip {
+  position: absolute;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 10;
+  max-width: 220px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.tooltip.show { opacity: 1; }
+.tooltip-head {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.tooltip-val { color: var(--cyan); }
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.empty-text { font-size: 12px; text-align: center; line-height: 1.7; }
+
+/* ── Loading ──────────────────────────────────────────────────────────── */
+.loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(14,47,47,.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  z-index: 20;
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.loading.show { opacity: 1; pointer-events: all; }
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Node info panel ──────────────────────────────────────────────────── */
+.node-panel {
+  position: absolute;
+  bottom: 16px; right: 16px;
+  width: 240px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 14px;
+  font-size: 11px;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all .2s;
+  pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.node-panel.show { transform: translateY(0); opacity: 1; pointer-events: all; }
+.node-panel-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+}
+.node-panel-close:hover { color: var(--text); }
+.node-panel-name {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  padding-right: 16px;
+  word-break: break-word;
+}
+.node-panel-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dim);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.node-panel-row:last-child { border-bottom: none; }
+.node-panel-row span:last-child { color: var(--cyan); }
+
+/* ── Edge info panel ──────────────────────────────────────────────────── */
+.edge-panel {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 260px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 14px;
+  font-size: 11px;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all .2s;
+  pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.edge-panel.show { transform: translateY(0); opacity: 1; pointer-events: all; }
+.edge-panel-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+}
+.edge-panel-close:hover { color: var(--text); }
+.edge-relation {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding-right: 16px;
+  letter-spacing: .5px;
+}
+.edge-nodes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.edge-node-tag {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edge-arrow { color: var(--text-dim); font-size: 14px; flex-shrink: 0; }
+.edge-score-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dim);
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.edge-score-row span:last-child { color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="logo">KGE Visualizer</div>
+    <div class="header-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">No data loaded</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sidebar-scroll">
+        <!-- Upload -->
+        <div class="card">
+          <div class="card-title">Data Input</div>
+          <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+            <div class="upload-label">
+              <strong id="upload-label-main">Upload CSV File</strong>
+              <span id="upload-label-sub">that includes head, relation, tail, score, head_x, head_y, tail_x, tail_y</span>
+            </div>
+          </div>
+          <input type="file" id="file-input" accept=".csv" onchange="handleUpload(event)">
+        </div>
+        <!-- Tree Data Upload -->
+        <div class="card" id="tree-upload-card">
+          <div class="card-title">Tree Data (ABA)</div>
+          <div class="upload-zone" id="tree-upload-zone"
+              onclick="document.getElementById('tree-file-input').click()">
+            <div class="upload-label">
+              <strong id="tree-upload-label-main">Upload aba_tree_structure.csv</strong>
+              <span id="tree-upload-label-sub">Required for Tree View</span>
+            </div>
+          </div>
+          <input type="file" id="tree-file-input" accept=".csv"
+                onchange="handleTreeUpload(event)">
+        </div>
+        <!-- Stats -->
+        <div class="card">
+          <div class="card-title">Dataset Stats</div>
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="stat-val" id="s-triples">—</div>
+              <div class="stat-label">Triples</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val" id="s-entities">—</div>
+              <div class="stat-label">Entities</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val" id="s-relations">—</div>
+              <div class="stat-label">Relations</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val" id="s-score">—</div>
+              <div class="stat-label">Avg Raw Score</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Relation breakdown -->
+        <div class="card" id="rel-card" style="display:none">
+          <div class="card-title">Relation Breakdown</div>
+          <div class="rel-bar-wrap" id="rel-bars"></div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card">
+          <div class="card-title">Graph Filters</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="control">
+              <div class="control-label">Relation Type</div>
+              <select id="filter-relation" onchange="fetchGraph()">
+                <option value="all">All relations</option>
+              </select>
+            </div>
+            <div class="control">
+              <div class="control-label">Search Entity</div>
+              <input type="text" id="filter-search" placeholder="type to filter nodes..." oninput="debounceGraph()">
+            </div>
+            <div class="slider-wrap">
+              <div class="slider-header">
+                <div class="control-label">Min Score</div>
+                <div class="slider-val" id="score-val">0.00</div>
+              </div>
+              <input type="range" id="filter-score" min="0" max="1" step="0.01" value="0"
+                     oninput="document.getElementById('score-val').textContent=parseFloat(this.value).toFixed(2);debounceGraph()">
+            </div>
+            <div class="control">
+              <div class="control-label">Max Edges</div>
+              <select id="filter-limit" onchange="fetchGraph()">
+                <option value="999999" >All</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="300" selected>300</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="card">
+          <div class="card-title">Legend</div>
+          <div class="legend">
+            <div class="legend-item">
+              <div class="legend-line" style="background:var(--contrary)"></div>
+              CONTRARY_TO
+            </div>
+            <div class="legend-item">
+              <div class="legend-line" style="background:var(--not-contrary)"></div>
+              NOT_CONTRARY
+            </div>
+            <div class="legend-item">
+              <div class="legend-line" style="background:var(--support)"></div>
+              SUPPORT
+            </div>
+            <div class="legend-item" style="margin-top:4px">
+              <div class="legend-dot" style="background:var(--bg3);border:1.5px solid var(--text-dim)"></div>
+              Entity node
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:var(--contrary);opacity:.7"></div>
+              Highlighted node
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-area">
+      <div class="canvas-toolbar">
+        <div class="tab-group">
+          <div class="tab active" id="tab-graph" onclick="switchTab('graph')">Graph View</div>
+          <div class="tab" id="tab-tree" onclick="switchTab('tree')">Tree View</div>
+        </div>
+        <div class="count-badge" id="edge-count">0 edges · 0 nodes</div>
+        <div class="toolbar-right">
+          <div class="icon-btn" onclick="resetView()" title="Reset view">⟳</div>
+          <div class="icon-btn" onclick="zoomBy(1.2)" title="Zoom in">+</div>
+          <div class="icon-btn" onclick="zoomBy(0.83)" title="Zoom out">−</div>
+
+        </div>
+      </div>
+
+      <div class="graph-wrap" id="graph-wrap">
+        <canvas id="graph-canvas"></canvas>
+      
+      <div id="tree-view" style="display:none; width:100%; height:100%; overflow:auto; padding:24px;">
+        <div id="tree-empty" style="color:var(--text-faint);font-size:12px;text-align:center;margin-top:80px;">
+          Select an entity from the left panel or search to build its argument tree.
+        </div>
+        <div id="tree-view-inner"></div>
+      </div>
+
+        <div class="empty-state" id="empty-state">
+          <div class="empty-text">Knowledge Graph will be displayed here.</div>
+        </div>
+
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          Loading graph...
+        </div>
+
+        <div class="tooltip" id="tooltip"></div>
+
+        <div class="node-panel" id="node-panel">
+          <div class="node-panel-close" onclick="closeNodePanel()">✕</div>
+          <div class="node-panel-name" id="np-name"></div>
+          <div class="node-panel-row"><span>Degree</span><span id="np-degree"></span></div>
+          <div class="node-panel-row"><span>Relations</span><span id="np-rels"></span></div>
+          <div class="node-panel-row"><span>Avg score</span><span id="np-score"></span></div>
+        </div>
+
+        <!-- Edge info panel -->
+        <div class="edge-panel" id="edge-panel">
+          <div class="edge-panel-close" onclick="closeEdgePanel()">✕</div>
+          <div class="edge-relation" id="ep-relation"></div>
+          <div class="edge-nodes">
+            <div class="edge-node-tag" id="ep-source" title=""></div>
+            <div class="edge-arrow">→</div>
+            <div class="edge-node-tag" id="ep-target" title=""></div>
+          </div>
+          <div class="edge-score-row">
+            <span>Score</span>
+            <span id="ep-score"></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000/api';
+
+// ── Palette ───────────────────────────────────────────────────────────────
+const C = {
+  contrary:    '#ff6ec7',
+  notContrary: '#98f0c8',
+  support:     '#cfff04',
+  nodeBg:      '#133535aa',
+  nodeStroke:  '#98f0c833',
+  labelDim:    '#a89e82',
+  labelHi:     '#f7f0df',
+  gold:        '#d6b04c',
+  selNode:     '#d6b04c',   // selected node glow
+  bg:          '#071515',
+};
+
+function edgeColor(rel) {
+  if (rel === 'CONTRARY_TO')  return '#ff6ec7';  // pink
+  if (rel === 'NOT_CONTRARY') return '#98f0c8';  // cyan
+  if (rel === 'SUPPORT')      return '#cfff04';  // amber/gold
+  return '#98f0c8';
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let G          = { nodes:[], edges:[] };
+let transform  = { x:0, y:0, scale:1 };
+let pos        = {};   // nodeId  -> {x, y, vx, vy}
+let ectrl      = {};   // edgeIdx -> {cx, cy}  custom bezier ctrl
+
+let drag       = null;
+// {type:'node', id, ox, oy}
+// {type:'edge', idx, ox, oy}
+// {type:'pan',  sx, sy}
+
+let mouseDown0 = null;  // {x,y} at mousedown for click detection
+
+let hoverNode  = null;
+let hoverEdge  = null;  // {idx, edge}
+
+// PERSISTENT SELECTION
+let selNode    = null;  // node object
+let selEdge    = null;  // {idx, edge}
+
+let simActive  = false;
+let raf        = null;
+let debTimer   = null;
+
+// ── Upload ────────────────────────────────────────────────────────────────
+async function handleUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  setLoading(true);
+  const form = new FormData(); form.append('file', file);
+  try {
+    const r = await fetch(`${API}/upload`,{method:'POST',body:form});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail||'Upload failed');
+    document.getElementById('status-dot').classList.add('live');
+    document.getElementById('status-text').textContent = `${d.rows.toLocaleString()} triples loaded`;
+    document.getElementById('upload-zone').classList.add('loaded');
+    document.getElementById('upload-label-main').textContent = file.name;
+    document.getElementById('upload-label-sub').textContent  =
+      `${d.rows.toLocaleString()} triples · ${d.entities.toLocaleString()} entities`;
+    try { await fetchStats(); } catch(e) { console.warn(e); }
+    populateRelFilter(Object.keys(d.rel_counts));
+    document.getElementById('empty-state').style.display = 'none';
+    await fetchGraph();
+  } catch(e) { alert(`Upload error: ${e.message}`); }
+  finally { setLoading(false); }
+}
+
+async function fetchStats() {
+  const d = await (await fetch(`${API}/stats`)).json();
+  const $ = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  $('s-triples', d.total_triples.toLocaleString());
+  $('s-entities',d.total_entities.toLocaleString());
+  $('s-relations',d.total_relations);
+  $('s-score',   d.score_raw_mean.toFixed(4));
+  const card=document.getElementById('rel-card'), bars=document.getElementById('rel-bars');
+  if (card) card.style.display='block';
+  if (!bars) return;
+  bars.innerHTML='';
+  const mx=Math.max(...Object.values(d.rel_counts));
+  Object.entries(d.rel_counts).sort((a,b)=>b[1]-a[1]).forEach(([rel,cnt])=>{
+    const col=edgeColor(rel);
+    const div=document.createElement('div'); div.className='rel-bar-row';
+    div.innerHTML=`<div class="rel-bar-label">
+      <span class="rel-name" style="color:${col}">${rel}</span>
+      <span class="rel-count">${cnt.toLocaleString()}</span></div>
+      <div class="rel-track"><div class="rel-fill"
+        style="width:${(cnt/mx*100).toFixed(1)}%;background:${col}"></div></div>`;
+    bars.appendChild(div);
+  });
+}
+
+function populateRelFilter(rels) {
+  const sel=document.getElementById('filter-relation');
+  sel.innerHTML='<option value="all">All relations</option>';
+  rels.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; sel.appendChild(o); });
+}
+
+async function fetchGraph() {
+  setLoading(true);
+  try {
+    const p=new URLSearchParams({
+      relation: document.getElementById('filter-relation').value,
+      min_score:document.getElementById('filter-score').value,
+      search:   document.getElementById('filter-search').value,
+      limit:    document.getElementById('filter-limit').value,
+    });
+    const d=await (await fetch(`${API}/graph?${p}`)).json();
+    G=d;
+    document.getElementById('edge-count').textContent=
+      `${d.edges.length.toLocaleString()} edges · ${d.nodes.length.toLocaleString()} nodes`;
+    selNode=null; selEdge=null;
+    closeNodePanel(); closeEdgePanel();
+    initPos();
+  } catch(e){ console.error(e); }
+  finally { setLoading(false); }
+}
+
+function debounceGraph() {
+  clearTimeout(debTimer); debTimer=setTimeout(fetchGraph,400);
+}
+
+// ── Init positions ────────────────────────────────────────────────────────
+function initPos() {
+  const cv=document.getElementById('graph-canvas');
+  const W=cv.offsetWidth||800, H=cv.offsetHeight||600, PAD=100;
+  const nodes=G.nodes; if (!nodes.length) return;
+  const xs=nodes.map(n=>n.x), ys=nodes.map(n=>n.y);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const rx=x1-x0||1, ry=y1-y0||1;
+  pos={};
+  nodes.forEach(n=>{
+    pos[n.id]={
+      x:PAD+((n.x-x0)/rx)*(W-PAD*2),
+      y:PAD+((n.y-y0)/ry)*(H-PAD*2),
+      vx:0,vy:0
+    };
+  });
+  ectrl={};
+  transform={x:0,y:0,scale:1};
+  // Skip simulation entirely if too many nodes
+  if (G.nodes.length > 300) {
+    simActive = false;
+    draw();
+  } else {
+    runSim(180);
+  }
+}
+
+// ── Force sim ─────────────────────────────────────────────────────────────
+function runSim(maxTicks) {
+  simActive=true;
+  let ticks=0;
+  function tick() {
+    if (!simActive||ticks++>=maxTicks){ simActive=false; draw(); return; }
+    applyForces(); requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function applyForces() {
+  const cv=document.getElementById('graph-canvas');
+  const W=cv.offsetWidth||800, H=cv.offsetHeight||600;
+  const REPEL=2500, ATT=0.004, DAMP=0.75, CEN=0.002, MIN=90;
+  G.nodes.forEach(a=>{
+    const pa=pos[a.id]; if(!pa) return;
+    if(drag&&drag.type==='node'&&drag.id===a.id) return;
+    pa.vx+=(W/2-pa.x)*CEN; pa.vy+=(H/2-pa.y)*CEN;
+    G.nodes.forEach(b=>{
+      if(a.id===b.id) return;
+      const pb=pos[b.id]; if(!pb) return;
+      const dx=pa.x-pb.x, dy=pa.y-pb.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||0.01;
+      const f=d<MIN?REPEL*4/(d*d):REPEL/(d*d);
+      pa.vx+=(dx/d)*f; pa.vy+=(dy/d)*f;
+    });
+  });
+  G.edges.forEach(e=>{
+    const ps=pos[e.source],pt=pos[e.target]; if(!ps||!pt) return;
+    const dx=pt.x-ps.x,dy=pt.y-ps.y;
+    ps.vx+=dx*ATT; ps.vy+=dy*ATT;
+    pt.vx-=dx*ATT; pt.vy-=dy*ATT;
+  });
+  G.nodes.forEach(n=>{
+    if(drag&&drag.type==='node'&&drag.id===n.id) return;
+    const p=pos[n.id]; if(!p) return;
+    p.vx*=DAMP; p.vy*=DAMP; p.x+=p.vx; p.y+=p.vy;
+    p.x=Math.max(20,Math.min(W-20,p.x));
+    p.y=Math.max(20,Math.min(H-20,p.y));
+  });
+}
+
+// ── Bezier ctrl point ─────────────────────────────────────────────────────
+function getCtrl(idx,ps,pt) {
+  if (ectrl[idx]) return ectrl[idx];
+  const mx=(ps.x+pt.x)/2, my=(ps.y+pt.y)/2;
+  const dx=pt.x-ps.x,     dy=pt.y-ps.y;
+  return { cx:mx-dy*0.1, cy:my+dx*0.1 };
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+function draw() { needsRedraw = true; }
+
+function _draw() {
+  const cv=document.getElementById('graph-canvas');
+  const wrap=document.getElementById('graph-wrap');
+  const dpr=window.devicePixelRatio||1;
+  const W=wrap.offsetWidth, H=wrap.offsetHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  const ctx=cv.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  if (!G.nodes.length) return;
+  if (simActive) applyForces();
+
+  ctx.save();
+  ctx.translate(transform.x,transform.y);
+  ctx.scale(transform.scale,transform.scale);
+
+  // ── Compute selection context ─────────────────────────────────────────
+  // Which nodes are neighbours of the selected node?
+  const nbSet=new Set(), nbRel={}, selEdgeSet=new Set();
+  if (selNode) {
+    G.edges.forEach((e,i)=>{
+      if (e.source===selNode.id||e.target===selNode.id) {
+        selEdgeSet.add(i);
+        const nb=e.source===selNode.id?e.target:e.source;
+        nbSet.add(nb); nbRel[nb]=e.relation;
+      }
+    });
+  }
+  // Which nodes are endpoints of the selected edge?
+  const seEndSet=new Set();
+  if (selEdge) { seEndSet.add(selEdge.edge.source); seEndSet.add(selEdge.edge.target); }
+
+  const hasSel=!!(selNode||selEdge);
+
+  // ── EDGES ─────────────────────────────────────────────────────────────
+  G.edges.forEach((e,idx)=>{
+    const ps=pos[e.source], pt=pos[e.target]; if(!ps||!pt) return;
+    const {cx,cy}=getCtrl(idx,ps,pt);
+    const col=edgeColor(e.relation);
+
+    const isSE   = selEdge && selEdge.idx===idx;
+    const isNE   = selNode && selEdgeSet.has(idx);
+    const isHov  = !hasSel && hoverEdge && hoverEdge.idx===idx;
+
+    // ── UNIFORM OPACITY for non-selected edges ─────────────────────────
+    // All edges get same base opacity — no score variation
+    let alpha, lw, drawCol;
+    if      (isSE)     { alpha=1;    lw=3;   drawCol=col; }
+    else if (isNE)     { alpha=0.95; lw=2.5; drawCol=col; }
+    else if (isHov)    { alpha=0.9;  lw=2.5; drawCol=C.gold; }
+    else if (hasSel)   { alpha=0.06; lw=0.8; drawCol=col; }
+    else               { alpha=0.55; lw=1;   drawCol=col; }  // uniform base
+
+    ctx.globalAlpha=alpha; ctx.strokeStyle=drawCol; ctx.lineWidth=lw;
+    ctx.beginPath(); ctx.moveTo(ps.x,ps.y);
+    ctx.quadraticCurveTo(cx,cy,pt.x,pt.y); ctx.stroke();
+
+    // Arrow
+    const t=0.82;
+    const ax=(1-t)*(1-t)*ps.x+2*(1-t)*t*cx+t*t*pt.x;
+    const ay=(1-t)*(1-t)*ps.y+2*(1-t)*t*cy+t*t*pt.y;
+    const ang=Math.atan2(pt.y-ay,pt.x-ax);
+    ctx.fillStyle=drawCol;
+    ctx.beginPath();
+    ctx.moveTo(pt.x,pt.y);
+    ctx.lineTo(pt.x-9*Math.cos(ang-0.35),pt.y-9*Math.sin(ang-0.35));
+    ctx.lineTo(pt.x-9*Math.cos(ang+0.35),pt.y-9*Math.sin(ang+0.35));
+    ctx.closePath(); ctx.fill();
+
+    // Relation label
+    if (isSE||isNE||isHov) {
+      ctx.globalAlpha=1;
+      ctx.font='600 11px Inter,sans-serif';
+      const tw=ctx.measureText(e.relation).width;
+      ctx.fillStyle=C.bg;
+      ctx.beginPath(); ctx.roundRect(cx-tw/2-5,cy-10,tw+10,18,4); ctx.fill();
+      ctx.fillStyle=isHov?C.gold:drawCol;
+      ctx.fillText(e.relation,cx-tw/2,cy+4);
+    }
+
+    // Drag handle dot
+    if (isSE||isHov) {
+      ctx.globalAlpha=1;
+      ctx.beginPath(); ctx.arc(cx,cy,6,0,Math.PI*2);
+      ctx.fillStyle=C.gold; ctx.fill();
+      ctx.strokeStyle=C.bg; ctx.lineWidth=1.5; ctx.stroke();
+    }
+
+    ctx.globalAlpha=1;
+  });
+
+  // ── NODES ─────────────────────────────────────────────────────────────
+  G.nodes.forEach(n=>{
+    const p=pos[n.id]; if(!p) return;
+    const isHov  = !hasSel && hoverNode && hoverNode.id===n.id;
+    const isSel  = selNode  && selNode.id===n.id;
+    const isNb   = selNode  && nbSet.has(n.id);
+    const isEEnd = selEdge  && seEndSet.has(n.id);
+    const isDrag = drag && drag.type==='node' && drag.id===n.id;
+    const r=6+Math.min(n.degree*1.5,14);
+
+    // Dim: only dim when there's a selection and node is not relevant
+    const dimmed = hasSel && !isSel && !isNb && !isEEnd;
+    ctx.globalAlpha=dimmed?0.06:1;
+
+    // ── Glow ring ──────────────────────────────────────────────────────
+    if (isSel||isNb||isEEnd||isDrag||isHov) {
+      ctx.globalAlpha=1; // always full opacity for glow
+      const gr=ctx.createRadialGradient(p.x,p.y,r*0.5,p.x,p.y,r+14);
+      let gc;
+      if      (isDrag)  gc=[152,240,200,0.7];
+      else if (isSel)   gc=[214,176,76,0.8];    // gold for selected node
+      else if (isEEnd)  {
+        const ee=selEdge.edge.relation==='CONTRARY_TO';
+        gc=ee?[180,20,20,0.75]:[100,230,180,0.75];
+      }
+      else if (isNb) {
+        const nb=nbRel[n.id]==='CONTRARY_TO';
+        gc=nb?[180,20,20,0.7]:[100,230,180,0.7];
+      }
+      else gc=[214,176,76,0.4]; // hover
+      gr.addColorStop(0,`rgba(${gc[0]},${gc[1]},${gc[2]},${gc[3]})`);
+      gr.addColorStop(1,'transparent');
+      ctx.beginPath(); ctx.arc(p.x,p.y,r+14,0,Math.PI*2);
+      ctx.fillStyle=gr; ctx.fill();
+    }
+
+    // Circle — force full opacity for selected/neighbour nodes
+    if (isSel||isNb||isEEnd) ctx.globalAlpha=1;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+    let fill=C.nodeBg;
+    if (isSel)  fill='rgba(214,176,76,0.25)';
+    if (isEEnd) fill=selEdge.edge.relation==='CONTRARY_TO'
+      ?'rgba(180,20,20,0.2)':'rgba(100,230,180,0.15)';
+    ctx.fillStyle=fill; ctx.fill();
+
+    // Stroke
+    let sc=C.nodeStroke, sw=1;
+    if      (isDrag) { sc=C.notContrary; sw=2; }
+    else if (isSel)  { sc=C.gold;        sw=2.5; }
+    else if (isEEnd) { sc=selEdge.edge.relation==='CONTRARY_TO'?C.contrary:C.notContrary; sw=2; }
+    else if (isNb)   { sc=nbRel[n.id]==='CONTRARY_TO'?C.contrary:C.notContrary; sw=2; }
+    else if (isHov)  { sc=C.gold; sw=2; }
+    ctx.strokeStyle=sc; ctx.lineWidth=sw; ctx.stroke();
+
+    // Label
+    const lbl=n.id.length>20?n.id.slice(0,19)+'…':n.id;
+    ctx.font=`${isSel||isHov?'500':'400'} 10px Inter,sans-serif`;
+    const tw=ctx.measureText(lbl).width;
+    const lx=p.x+r+5, ly=p.y+4;
+    ctx.globalAlpha=dimmed?0.06:0.8;
+    ctx.fillStyle=C.bg;
+    ctx.beginPath(); ctx.roundRect(lx-2,ly-10,tw+6,14,3); ctx.fill();
+    ctx.globalAlpha=dimmed?0.06:1;
+    ctx.fillStyle=isSel||isHov?C.labelHi:C.labelDim;
+    ctx.fillText(lbl,lx,ly);
+    ctx.globalAlpha=1;
+  });
+
+  ctx.restore();
+}
+
+// ── World coords ──────────────────────────────────────────────────────────
+function toW(ex,ey){ return {x:(ex-transform.x)/transform.scale, y:(ey-transform.y)/transform.scale}; }
+
+// ── Hit tests ─────────────────────────────────────────────────────────────
+function nodeAt(mx,my) {
+  const {x,y}=toW(mx,my);
+  for (const n of G.nodes) {
+    const p=pos[n.id]; if(!p) continue;
+    if (Math.hypot(p.x-x,p.y-y)<6+Math.min(n.degree*1.5,14)+7) return n;
+  }
+  return null;
+}
+
+function edgeAt(mx,my) {
+  const {x,y}=toW(mx,my);
+  const thr=Math.max(7,7/transform.scale);
+  for (let i=0;i<G.edges.length;i++) {
+    const e=G.edges[i];
+    const ps=pos[e.source],pt=pos[e.target]; if(!ps||!pt) continue;
+    const {cx,cy}=getCtrl(i,ps,pt);
+    for (let t=0;t<=1;t+=0.04) {
+      const bx=(1-t)*(1-t)*ps.x+2*(1-t)*t*cx+t*t*pt.x;
+      const by=(1-t)*(1-t)*ps.y+2*(1-t)*t*cy+t*t*pt.y;
+      if (Math.hypot(bx-x,by-y)<thr) return {edge:e,idx:i};
+    }
+  }
+  return null;
+}
+
+function handleAt(mx,my) {
+  const {x,y}=toW(mx,my);
+  const check=e=>{
+    if (!e) return null;
+    const ps=pos[e.edge.source],pt=pos[e.edge.target]; if(!ps||!pt) return null;
+    const {cx,cy}=getCtrl(e.idx,ps,pt);
+    return Math.hypot(cx-x,cy-y)<14/transform.scale?e:null;
+  };
+  return check(selEdge)||check(hoverEdge);
+}
+
+// ── Mouse events ──────────────────────────────────────────────────────────
+const cv=document.getElementById('graph-canvas');
+
+cv.addEventListener('mousedown',ev=>{
+  mouseDown0={x:ev.offsetX,y:ev.offsetY};
+  const wp=toW(ev.offsetX,ev.offsetY);
+
+  // Priority 1: edge handle
+  const h=handleAt(ev.offsetX,ev.offsetY);
+  if (h) {
+    const {cx,cy}=getCtrl(h.idx,pos[h.edge.source],pos[h.edge.target]);
+    drag={type:'edge',idx:h.idx,ox:wp.x-cx,oy:wp.y-cy};
+    cv.style.cursor='grabbing'; return;
+  }
+  // Priority 2: node
+  const nd=nodeAt(ev.offsetX,ev.offsetY);
+  if (nd) {
+    drag={type:'node',id:nd.id,ox:wp.x-pos[nd.id].x,oy:wp.y-pos[nd.id].y};
+    cv.style.cursor='grabbing'; return;
+  }
+  // Priority 3: pan
+  drag={type:'pan',sx:ev.offsetX-transform.x,sy:ev.offsetY-transform.y};
+  cv.style.cursor='grabbing';
+});
+
+cv.addEventListener('mousemove',ev=>{
+  const wp=toW(ev.offsetX,ev.offsetY);
+  if (drag) {
+    if (drag.type==='edge') {
+      ectrl[drag.idx]={cx:wp.x-drag.ox,cy:wp.y-drag.oy};
+      draw(); return;
+    }
+    if (drag.type==='node') {
+      const p=pos[drag.id]; p.x=wp.x-drag.ox; p.y=wp.y-drag.oy; p.vx=0; p.vy=0;
+      draw(); return;
+    }
+    if (drag.type==='pan') {
+      transform.x=ev.offsetX-drag.sx; transform.y=ev.offsetY-drag.sy;
+      draw(); return;
+    }
+  }
+
+  // Hover
+  const nd=nodeAt(ev.offsetX,ev.offsetY);
+  hoverNode=nd;
+  const eh=nd?null:edgeAt(ev.offsetX,ev.offsetY);
+  hoverEdge=eh;
+
+  if      (nd)                                cv.style.cursor='pointer';
+  else if (handleAt(ev.offsetX,ev.offsetY))   cv.style.cursor='grab';
+  else if (eh)                                cv.style.cursor='pointer';
+  else                                        cv.style.cursor='grab';
+
+  // Tooltip
+  const tip=document.getElementById('tooltip');
+  if (nd) {
+    const edges=G.edges.filter(e=>e.source===nd.id||e.target===nd.id);
+    const avg=edges.length?(edges.reduce((s,e)=>s+e.score,0)/edges.length).toFixed(3):'—';
+    const rels=[...new Set(edges.map(e=>e.relation))].join(', ');
+    tip.innerHTML=`<div class="tooltip-head">${nd.id}</div>
+      <div class="tooltip-row"><span>Degree</span><span class="tooltip-val">${nd.degree}</span></div>
+      <div class="tooltip-row"><span>Relations</span><span class="tooltip-val">${rels||'—'}</span></div>
+      <div class="tooltip-row"><span>Avg score</span><span class="tooltip-val">${avg}</span></div>`;
+    tip.style.left=(ev.offsetX+14)+'px'; tip.style.top=(ev.offsetY-10)+'px';
+    tip.classList.add('show');
+  } else if (eh) {
+    const col=edgeColor(eh.edge.relation);
+    tip.innerHTML=`<div class="tooltip-head" style="color:${col}">${eh.edge.relation}</div>
+      <div class="tooltip-row"><span>${eh.edge.source}</span></div>
+      <div class="tooltip-row"><span>→</span><span class="tooltip-val">${eh.edge.target}</span></div>
+      <div class="tooltip-row"><span>Score</span><span class="tooltip-val">${eh.edge.score}</span></div>`;
+    tip.style.left=(ev.offsetX+14)+'px'; tip.style.top=(ev.offsetY-10)+'px';
+    tip.classList.add('show');
+  } else { tip.classList.remove('show'); }
+
+  if (!simActive) draw();
+});
+
+cv.addEventListener('mouseup',ev=>{
+  const moved=mouseDown0&&(Math.abs(ev.offsetX-mouseDown0.x)>6||Math.abs(ev.offsetY-mouseDown0.y)>6);
+  // Only treat as a drag if the mouse actually moved — a stationary mousedown+mouseup is always a click
+  const wasDrag=moved && drag && drag.type!=='pan';
+  drag=null;
+  cv.style.cursor='grab';
+
+  if (!moved) {
+    const nd=nodeAt(ev.offsetX,ev.offsetY);
+    const eh=nd?null:edgeAt(ev.offsetX,ev.offsetY);
+
+    if (nd) {
+      console.log('[click] node:', nd.id);
+      selNode  = (selNode&&selNode.id===nd.id) ? null : nd;
+      selEdge  = null;
+      closeEdgePanel();
+      selNode ? showNodePanel(selNode) : closeNodePanel();
+    } else if (eh) {
+      selEdge  = (selEdge&&selEdge.idx===eh.idx) ? null : eh;
+      selNode  = null;
+      closeNodePanel();
+      selEdge ? showEdgePanel(selEdge.edge) : closeEdgePanel();
+    } else {
+      // Click empty space — deselect everything
+      selNode=null; selEdge=null;
+      closeNodePanel(); closeEdgePanel();
+    }
+    draw();
+  }
+  mouseDown0=null;
+});
+
+cv.addEventListener('mouseleave',()=>{
+  drag=null; hoverNode=null; hoverEdge=null;
+  document.getElementById('tooltip').classList.remove('show');
+});
+
+cv.addEventListener('wheel',ev=>{
+  ev.preventDefault();
+  const f=ev.deltaY<0?1.1:0.91;
+  transform.x=ev.offsetX-f*(ev.offsetX-transform.x);
+  transform.y=ev.offsetY-f*(ev.offsetY-transform.y);
+  transform.scale=Math.max(0.04,Math.min(12,transform.scale*f));
+  draw();
+},{passive:false});
+
+// ── Controls ──────────────────────────────────────────────────────────────
+function zoomBy(f) {
+  const wrap=document.getElementById('graph-wrap');
+  const cx=wrap.offsetWidth/2,cy=wrap.offsetHeight/2;
+  transform.x=cx-f*(cx-transform.x); transform.y=cy-f*(cy-transform.y);
+  transform.scale=Math.max(0.04,Math.min(12,transform.scale*f));
+  draw();
+}
+function resetView() {
+  selNode=null; selEdge=null; closeNodePanel(); closeEdgePanel(); initPos();
+}
+
+// ── Panels ────────────────────────────────────────────────────────────────
+function showNodePanel(nd) {
+  const edges=G.edges.filter(e=>e.source===nd.id||e.target===nd.id);
+  const avg=edges.length?(edges.reduce((s,e)=>s+e.score,0)/edges.length).toFixed(3):'—';
+  const rels=[...new Set(edges.map(e=>e.relation))].join(', ');
+  document.getElementById('np-name').textContent   = nd.id;
+  document.getElementById('np-degree').textContent = nd.degree;
+  document.getElementById('np-rels').textContent   = rels||'—';
+  document.getElementById('np-score').textContent  = avg;
+  document.getElementById('node-panel').classList.add('show');
+}
+function closeNodePanel() {
+  document.getElementById('node-panel').classList.remove('show');
+}
+
+function showEdgePanel(edge) {
+  const col=edgeColor(edge.relation);
+  const el=document.getElementById('ep-relation');
+  el.textContent=edge.relation; el.style.color=col;
+  const src=document.getElementById('ep-source');
+  const tgt=document.getElementById('ep-target');
+  src.textContent=edge.source; src.title=edge.source;
+  tgt.textContent=edge.target; tgt.title=edge.target;
+  document.getElementById('ep-score').textContent=edge.score;
+  document.getElementById('edge-panel').classList.add('show');
+}
+function closeEdgePanel() {
+  selEdge=null;
+  document.getElementById('edge-panel').classList.remove('show');
+  draw();
+}
+
+function setLoading(on) {
+  document.getElementById('loading').classList.toggle('show',on);
+}
+window.addEventListener('resize',()=>{ if(G.nodes.length) draw(); });
+// Dirty flag + render loop
+let needsRedraw = false;
+
+function renderLoop() {
+  if (needsRedraw) {
+    needsRedraw = false;
+    _draw();
+  }
+  requestAnimationFrame(renderLoop);
+}
+renderLoop();
+// ── Tab switching ─────────────────────────────────────────────────────────
+let currentTab = 'graph';
+ 
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-graph').classList.toggle('active', tab === 'graph');
+  document.getElementById('tab-tree').classList.toggle('active',  tab === 'tree');
+ 
+  const canvas   = document.getElementById('graph-canvas');
+  const treeView = document.getElementById('tree-view');
+  const empty    = document.getElementById('empty-state');
+ 
+  canvas.style.display   = tab === 'graph' ? 'block' : 'none';
+  treeView.style.display = tab === 'tree'  ? 'block' : 'none';
+ 
+  if (empty) {
+    empty.style.display = (tab === 'graph' && !G.nodes.length) ? 'flex' : 'none';
+  }
+ 
+  if (tab === 'tree') renderTreeControls();
+}
+ 
+// ── Tree data state ───────────────────────────────────────────────────────
+let treeData      = null;   // full API response from /api/tree
+let treePage      = 0;
+const TREES_PER_PAGE = 3;   // show 3 claim trees per page
+ 
+// ── Upload aba_tree_structure.csv ─────────────────────────────────────────
+async function handleTreeUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  setLoading(true);
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const r = await fetch(`${API}/upload/tree`, { method: 'POST', body: form });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Tree upload failed');
+ 
+    document.getElementById('tree-upload-zone').classList.add('loaded');
+    document.getElementById('tree-upload-label-main').textContent = file.name;
+    document.getElementById('tree-upload-label-sub').textContent  =
+      `${d.claims} claims · ${d.bodies} bodies · ${d.attackers} attackers`;
+ 
+    // Auto-switch to tree view after upload
+    switchTab('tree');
+    await fetchTree();
+  } catch(e) {
+    alert(`Tree upload error: ${e.message}`);
+  } finally {
+    setLoading(false);
+  }
+}
+ 
+// ── Fetch tree data from backend ──────────────────────────────────────────
+async function fetchTree(claim='all', attackRel='all', domain='all') {
+  setLoading(true);
+  try {
+    const p = new URLSearchParams({
+      claim,
+      attack_relation: attackRel,
+      domain,
+    });
+    const d = await (await fetch(`${API}/tree?${p}`)).json();
+    treeData = d;
+    treePage = 0;
+    renderTreeView();
+  } catch(e) {
+    document.getElementById('tree-view-inner').innerHTML =
+      `<div class="tree-empty">Failed to load tree data: ${e.message}</div>`;
+  } finally {
+    setLoading(false);
+  }
+}
+ 
+// ── Render controls bar + trees ───────────────────────────────────────────
+function renderTreeControls() {
+  const inner = document.getElementById('tree-view-inner');
+ 
+  if (!treeData) {
+    inner.innerHTML = `<div class="tree-empty">
+      Please upload <strong>aba_tree_structure.csv</strong> using the sidebar panel.<br>
+      This file is produced by the training script after RotatE training.
+    </div>`;
+    return;
+  }
+ 
+  renderTreeView();
+}
+ 
+function renderTreeView() {
+  if (!treeData) return;
+ 
+  const inner  = document.getElementById('tree-view-inner');
+  const claims = treeData.available_claims || [];
+  const domains= treeData.available_domains || [];
+  const trees  = treeData.trees || {};
+  const treeList = Object.values(trees);
+ 
+  // ── Pagination ──────────────────────────────────────────────────────────
+  const totalPages = Math.ceil(treeList.length / TREES_PER_PAGE);
+  const pageTrees  = treeList.slice(
+    treePage * TREES_PER_PAGE,
+    (treePage + 1) * TREES_PER_PAGE
+  );
+ 
+  // ── Controls HTML ───────────────────────────────────────────────────────
+  const claimOptions = ['all', ...claims]
+    .map(c => `<option value="${c}">${c === 'all' ? 'All claims' : c}</option>`)
+    .join('');
+ 
+  const domainOptions = domains.length
+    ? ['all', ...domains].map(d =>
+        `<option value="${d}">${d === 'all' ? 'All domains' : d}</option>`).join('')
+    : '<option value="all">All domains</option>';
+ 
+  const controlsHtml = `
+    <div class="tree-controls">
+      <div class="tree-control-group">
+        <div class="tree-control-label">Claim</div>
+        <select id="tree-filter-claim" onchange="onTreeFilter()">
+          ${claimOptions}
+        </select>
+      </div>
+      <div class="tree-control-group">
+        <div class="tree-control-label">Attack Relation</div>
+        <select id="tree-filter-attack" onchange="onTreeFilter()">
+          <option value="all">All types</option>
+          <option value="CONTRARY_TO">CONTRARY_TO</option>
+          <option value="NOT_CONTRARY">NOT_CONTRARY</option>
+        </select>
+      </div>
+      <div class="tree-control-group">
+        <div class="tree-control-label">Domain</div>
+        <select id="tree-filter-domain" onchange="onTreeFilter()">
+          ${domainOptions}
+        </select>
+      </div>
+      <div class="tree-legend-row">
+        <div class="tree-legend-item">
+          <div class="tree-legend-dot" style="border-color:var(--cyan)"></div>Claim (root)
+        </div>
+        <div class="tree-legend-item">
+          <div class="tree-legend-dot" style="border-color:var(--amber)"></div>Body (assumption)
+        </div>
+        <div class="tree-legend-item">
+          <div class="tree-legend-dot" style="border-color:var(--contrary)"></div>CONTRARY_TO attacker
+        </div>
+        <div class="tree-legend-item">
+          <div class="tree-legend-dot" style="border-color:var(--not-contrary)"></div>NOT_CONTRARY attacker
+        </div>
+      </div>
+    </div>`;
+ 
+  // ── Tree cards HTML ─────────────────────────────────────────────────────
+  const treesHtml = pageTrees.length === 0
+    ? `<div class="tree-empty">No trees found for current filters.</div>`
+    : pageTrees.map(t => renderTreeCard(t)).join('');
+ 
+  // ── Pagination HTML ─────────────────────────────────────────────────────
+  const paginationHtml = totalPages > 1 ? `
+    <div class="tree-pagination">
+      <div class="tree-page-btn ${treePage===0?'disabled':''}"
+           onclick="treePage=Math.max(0,treePage-1);renderTreeView()">← Prev</div>
+      <div class="tree-page-info">
+        Page ${treePage+1} of ${totalPages} &nbsp;·&nbsp; ${treeList.length} claim trees total
+      </div>
+      <div class="tree-page-btn ${treePage>=totalPages-1?'disabled':''}"
+           onclick="treePage=Math.min(${totalPages-1},treePage+1);renderTreeView()">Next →</div>
+    </div>` : '';
+ 
+  inner.innerHTML = controlsHtml + treesHtml + paginationHtml;
+}
+ 
+// ── Render a single claim tree card ──────────────────────────────────────
+function renderTreeCard(tree) {
+  const stats = tree.stats || {};
+ 
+  const statsHtml = `
+    <div class="tree-stat-badge">Bodies: <span>${stats.total_bodies}</span></div>
+    <div class="tree-stat-badge">Attackers: <span>${stats.total_attackers}</span></div>
+    <div class="tree-stat-badge" style="color:var(--contrary)">
+      CONTRARY: <span style="color:var(--contrary)">${stats.contrary_count}</span>
+    </div>
+    <div class="tree-stat-badge">
+      NOT_CONTRARY: <span>${stats.not_contrary_count}</span>
+    </div>`;
+ 
+  // Show up to 30 bodies per card to avoid browser freeze
+  const MAX_BODIES = 30;
+  const bodies     = (tree.bodies || []).slice(0, MAX_BODIES);
+  const moreCount  = (tree.bodies || []).length - MAX_BODIES;
+ 
+  const bodiesHtml = bodies.map(body => {
+    const MAX_ATTACKERS = 8;
+    const attackers     = (body.attackers || []).slice(0, MAX_ATTACKERS);
+    const moreAtk       = (body.attackers || []).length - MAX_ATTACKERS;
+ 
+    const attackersHtml = attackers.map(atk => {
+      const cls = atk.relation === 'CONTRARY_TO'
+        ? 'attacker-contrary'
+        : atk.relation === 'SUPPORT'
+          ? 'attacker-support'
+          : 'attacker-not-contrary';
+      const labelCls = atk.relation === 'CONTRARY_TO'
+        ? 'contrary'
+        : atk.relation === 'SUPPORT'
+          ? 'support'
+          : 'not-contrary';
+      const icon = atk.relation === 'CONTRARY_TO' ? '⚔' : atk.relation === 'SUPPORT' ? '★' : '✓';
+ 
+      return `
+        <div class="tree-connector-label ${labelCls}">${icon} ${atk.relation}</div>
+        <div class="tree-node-box ${cls}" title="${atk.name}">
+          ${atk.name.length > 28 ? atk.name.slice(0,27)+'…' : atk.name}
+          <div class="tree-node-type">attacker</div>
+        </div>`;
+    }).join('');
+ 
+    const moreAtkHtml = moreAtk > 0
+      ? `<div style="font-size:10px;color:var(--text-faint);margin-top:4px">+${moreAtk} more...</div>`
+      : '';
+ 
+    const scoreHtml = body.body_score != null
+      ? `<div style="font-size:9px;color:var(--text-faint);margin-top:2px">score: ${parseFloat(body.body_score).toFixed(3)}</div>`
+      : '';
+ 
+    return `
+      <div class="tree-body-col">
+        <!-- Claim → Body connector -->
+        <div class="tree-connector-down"></div>
+        <div class="tree-connector-label support">★ SUPPORT</div>
+        <div class="tree-connector-down"></div>
+ 
+        <!-- Body node -->
+        <div class="tree-node-box body" title="${body.name}">
+          ${body.name.length > 28 ? body.name.slice(0,27)+'…' : body.name}
+          <div class="tree-node-type">body</div>
+          ${scoreHtml}
+        </div>
+ 
+        <!-- Attackers -->
+        <div class="tree-attackers-wrap">
+          ${attackersHtml}
+          ${moreAtkHtml}
+        </div>
+      </div>`;
+  }).join('');
+ 
+  const moreBodyHtml = moreCount > 0
+    ? `<div style="min-width:120px;display:flex;align-items:center;justify-content:center;
+                  color:var(--text-faint);font-size:11px;padding:20px">
+         +${moreCount} more bodies...
+       </div>`
+    : '';
+ 
+  return `
+    <div class="tree-card">
+      <div class="tree-card-header">
+        <div class="tree-node-box claim">${tree.claim}</div>
+        ${statsHtml}
+      </div>
+      <div class="tree-scroll">
+        ${bodiesHtml}
+        ${moreBodyHtml}
+      </div>
+    </div>`;
+}
+ 
+// ── Filter handler ────────────────────────────────────────────────────────
+function onTreeFilter() {
+  const claim     = document.getElementById('tree-filter-claim')?.value  || 'all';
+  const attackRel = document.getElementById('tree-filter-attack')?.value || 'all';
+  const domain    = document.getElementById('tree-filter-domain')?.value || 'all';
+  treePage = 0;
+  fetchTree(claim, attackRel, domain);
+}
+</script>
+</body>
+</html>
