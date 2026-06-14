@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KGE Visualizer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0e2f2f;--bg1:#0a1f1f;--bg2:#0d2828;--bg3:#133535;
+  --border:rgba(152,240,200,.10);--border2:rgba(152,240,200,.20);
+  --text:#f7f0df;--text-dim:#d6b04c;--text-faint:#8a8d8b;
+  --cyan:#98f0c8;--cyan-dim:rgba(152,240,200,.15);
+  --amber:#d6b04c;--amber-dim:rgba(214,176,76,.15);
+  --green:#06d6a0;--green-dim:rgba(6,214,160,.12);
+  --contrary:#ff6ec7;--not-contrary:#98f0c8;--support:#cfff04;
+  --radius:10px;--font:'Inter',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.5;overflow:hidden;}
+.app{display:grid;grid-template-rows:52px 1fr;height:100vh;}
+.layout{display:grid;grid-template-columns:300px 1fr;overflow:hidden;}
+header{display:flex;align-items:center;gap:16px;padding:0 24px;background:var(--bg1);border-bottom:1px solid var(--border);}
+.logo{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.2px;}
+.header-status{margin-left:auto;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:8px;}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);transition:background .3s;}
+.status-dot.live{background:var(--green);box-shadow:0 0 8px var(--green);}
+.sidebar{background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
+.sidebar-scroll::-webkit-scrollbar{width:4px;}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.card-title{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.card-title-legend{margin-left:auto;display:flex;gap:6px;font-size:9px;font-weight:400;letter-spacing:.5px;text-transform:none;}
+.upload-zone{border:1.5px dashed var(--border2);border-radius:var(--radius);padding:16px 14px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.02);}
+.upload-zone:hover{border-color:var(--cyan);background:var(--cyan-dim);}
+.upload-zone.loaded{border-color:var(--green);background:var(--green-dim);border-style:solid;}
+.upload-label{font-size:11px;color:var(--text-dim);line-height:1.6;}
+.upload-label strong{color:var(--text);display:block;margin-bottom:3px;}
+
+/* ── Raw vs Clean stats table ── */
+.stats-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px;}
+.stats-table thead th{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 8px;text-align:center;border-bottom:1px solid var(--border);}
+.stats-table thead th.col-label{text-align:left;color:var(--text-faint);}
+.stats-table thead th.col-raw{color:var(--contrary);}
+.stats-table thead th.col-clean{color:var(--green);}
+.stats-table tbody td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.stats-table tbody tr:last-child td{border-bottom:none;}
+.stats-table td.col-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+.stats-table td.col-raw{text-align:center;font-size:16px;font-weight:700;color:var(--contrary);}
+.stats-table td.col-clean{text-align:center;font-size:16px;font-weight:700;color:var(--green);}
+
+/* ── Duplicates badge ── */
+.dup-badge{display:none;margin-top:8px;padding:6px 10px;background:var(--amber-dim);border:1px solid var(--amber);border-radius:6px;font-size:11px;color:var(--amber);text-align:center;}
+
+/* ── Relation bars ── */
+.rel-bar-wrap{display:flex;flex-direction:column;gap:8px;}
+.rel-bar-row{display:flex;flex-direction:column;gap:3px;}
+.rel-bar-label{display:flex;justify-content:space-between;font-size:11px;align-items:center;}
+.rel-name{color:var(--text);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rel-counts{display:flex;gap:4px;font-size:10px;align-items:center;}
+.rel-track{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;position:relative;}
+.rel-fill-raw{position:absolute;height:100%;border-radius:3px;opacity:.28;}
+.rel-fill-clean{position:absolute;height:100%;border-radius:3px;}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat{background:var(--bg3);border-radius:8px;padding:10px 12px;border:1px solid var(--border);}
+.stat-val{font-size:20px;font-weight:700;color:var(--cyan);line-height:1;margin-bottom:3px;}
+.stat-label{font-size:10px;color:var(--text-dim);letter-spacing:.5px;text-transform:uppercase;}
+.control{display:flex;flex-direction:column;gap:5px;}
+.control-label{font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;}
+select,input[type=text]{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;font-family:var(--font);font-size:12px;outline:none;transition:border-color .2s;appearance:none;}
+select:focus,input[type=text]:focus{border-color:var(--cyan);}
+.slider-wrap{display:flex;flex-direction:column;gap:5px;}
+.slider-header{display:flex;justify-content:space-between;align-items:center;}
+.slider-val{font-size:11px;color:var(--cyan);}
+input[type=range]{width:100%;accent-color:var(--cyan);cursor:pointer;height:4px;}
+.legend{display:flex;flex-direction:column;gap:6px;}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-dim);}
+.legend-solid{width:12px;height:12px;border-radius:3px;flex-shrink:0;display:inline-block;}
+.legend-solid.circle{border-radius:50%;}
+.legend-divider{border-top:1px solid var(--border);margin:4px 0;padding-top:4px;font-size:10px;color:var(--text-faint);letter-spacing:1px;text-transform:uppercase;}
+.canvas-area{display:grid;grid-template-rows:auto 1fr;overflow:hidden;background:var(--bg);}
+.canvas-toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg1);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.tab-group{display:flex;gap:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:3px;}
+.tab{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--text-dim);cursor:pointer;transition:all .2s;user-select:none;}
+.tab:hover{color:var(--text);background:var(--bg3);}
+.tab.active{background:var(--bg3);color:var(--cyan);border:1px solid var(--border2);}
+.toolbar-right{margin-left:auto;display:flex;gap:6px;}
+.icon-btn{width:30px;height:30px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;user-select:none;}
+.icon-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--border2);}
+.count-badge{font-size:10px;color:var(--text-dim);background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;white-space:nowrap;}
+.toggle-btn{font-size:11px;padding:4px 10px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:all .15s;user-select:none;white-space:nowrap;}
+.toggle-btn:hover{background:var(--bg3);color:var(--text);}
+.toggle-btn.active{background:var(--cyan-dim);color:var(--cyan);border-color:var(--cyan);}
+.toggle-btn.warn{background:rgba(255,110,199,.1);color:var(--contrary);border-color:var(--contrary);}
+.toggle-btn.warn:hover{background:rgba(255,110,199,.2);}
+.toggle-btn.raw-active{background:rgba(255,110,199,.1);color:var(--contrary);border-color:var(--contrary);}
+.raw-banner{display:none;padding:3px 10px;background:rgba(255,110,199,.08);border:1px solid var(--contrary);border-radius:5px;font-size:10px;color:var(--contrary);letter-spacing:.5px;text-transform:uppercase;}
+.raw-banner.show{display:block;}
+.graph-wrap{position:relative;overflow:hidden;background:radial-gradient(ellipse at 30% 40%,rgba(152,240,200,.04) 0%,transparent 60%),radial-gradient(ellipse at 70% 70%,rgba(214,176,76,.03) 0%,transparent 60%),var(--bg);}
+#graph-canvas{display:block;width:100%;height:100%;cursor:grab;}
+#graph-canvas:active{cursor:grabbing;}
+#tree-canvas-wrap{position:absolute;inset:0;background:radial-gradient(ellipse at 30% 40%,rgba(152,240,200,.04) 0%,transparent 60%),radial-gradient(ellipse at 70% 70%,rgba(214,176,76,.03) 0%,transparent 60%),var(--bg);display:none;}
+#tree-canvas{display:block;width:100%;height:100%;cursor:grab;}
+#tree-canvas:active{cursor:grabbing;}
+.tooltip,#tree-tooltip{position:absolute;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:10px 13px;font-size:11px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:10;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.tooltip.show,#tree-tooltip.show{opacity:1;}
+.tooltip-head{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;word-break:break-word;}
+.tooltip-row{display:flex;justify-content:space-between;gap:10px;color:var(--text-dim);margin-top:2px;}
+.tooltip-val{color:var(--cyan);}
+.empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-faint);pointer-events:none;}
+.empty-text{font-size:12px;text-align:center;line-height:1.7;}
+.loading{position:absolute;inset:0;background:rgba(14,47,47,.7);display:flex;align-items:center;justify-content:center;gap:10px;font-size:12px;color:var(--text-dim);z-index:20;backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .2s;}
+.loading.show{opacity:1;pointer-events:all;}
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.info-panel{position:absolute;bottom:16px;width:260px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:14px;font-size:11px;transform:translateY(20px);opacity:0;transition:all .2s;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.info-panel.right{right:16px;}
+.info-panel.left{left:16px;}
+.info-panel.show{transform:translateY(0);opacity:1;pointer-events:all;}
+.panel-close{position:absolute;top:8px;right:10px;cursor:pointer;color:var(--text-dim);font-size:14px;}
+.panel-close:hover{color:var(--text);}
+.panel-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;padding-right:16px;word-break:break-word;}
+.panel-row{display:flex;justify-content:space-between;color:var(--text-dim);padding:3px 0;border-bottom:1px solid var(--border);}
+.panel-row:last-child{border-bottom:none;}
+.panel-row span:last-child{color:var(--cyan);}
+.panel-relation{font-size:13px;font-weight:700;margin-bottom:10px;padding-right:16px;letter-spacing:.5px;}
+.panel-nodes{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.panel-node-tag{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.panel-arrow{color:var(--text-dim);font-size:14px;}
+.panel-score-row{display:flex;justify-content:space-between;color:var(--text-dim);padding-top:8px;border-top:1px solid var(--border);}
+.panel-score-row span:last-child{color:var(--cyan);}
+.bundle-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;margin:6px 0;gap:2px;}
+.bundle-seg{height:100%;border-radius:2px;}
+.panel-action-btn{width:100%;margin-top:10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--cyan);padding:6px;font-size:11px;cursor:pointer;font-family:var(--font);transition:all .2s;text-align:center;}
+.panel-action-btn:hover{background:var(--cyan-dim);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">KGE Visualizer</div>
+    <div class="header-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">No data loaded</span>
+    </div>
+  </header>
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sidebar-scroll">
+
+        <!-- ── GRAPH DATA UPLOAD ── -->
+        <div class="card" id="card-upload-graph">
+          <div class="card-title">Graph Data</div>
+          <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+            <div class="upload-label">
+              <strong id="upload-label-main">Upload visualization_data.csv</strong>
+              <span id="upload-label-sub">head, relation, tail, score, head_x, head_y, tail_x, tail_y</span>
+            </div>
+          </div>
+          <input type="file" id="file-input" accept=".csv" onchange="handleUpload(event)" style="display:none">
+        </div>
+
+        <!-- ── TREE DATA UPLOAD ── -->
+        <div class="card" id="card-upload-tree">
+          <div class="card-title">Tree Data (ABA)</div>
+          <div class="upload-zone" id="tree-upload-zone" onclick="document.getElementById('tree-file-input').click()">
+            <div class="upload-label">
+              <strong id="tree-upload-label-main">Upload aba_tree_structure.csv</strong>
+              <span id="tree-upload-label-sub">claim, body, attacker, body_relation, attack_relation, body_score, attack_score</span>
+            </div>
+          </div>
+          <input type="file" id="tree-file-input" accept=".csv" onchange="handleTreeUpload(event)" style="display:none">
+        </div>
+
+        <!-- ── GRAPH STATS — raw vs clean ── -->
+        <div class="card" id="card-stats-graph">
+          <div class="card-title">
+            Graph Stats
+            <span class="card-title-legend">
+              <span style="color:var(--contrary)">■ Raw</span>
+              <span style="color:var(--green)">■ Clean</span>
+            </span>
+          </div>
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th class="col-label"></th>
+                <th class="col-raw">Raw</th>
+                <th class="col-clean">Clean</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-label">Triples</td>
+                <td class="col-raw"   id="rc-raw-triples">—</td>
+                <td class="col-clean" id="rc-clean-triples">—</td>
+              </tr>
+              <tr>
+                <td class="col-label">Entities</td>
+                <td class="col-raw"   id="rc-raw-entities">—</td>
+                <td class="col-clean" id="rc-clean-entities">—</td>
+              </tr>
+              <tr>
+                <td class="col-label">Relations</td>
+                <td class="col-raw"   id="rc-raw-relations">—</td>
+                <td class="col-clean" id="rc-clean-relations">—</td>
+              </tr>
+              <tr>
+                <td class="col-label">Avg Score</td>
+                <td class="col-raw"   id="rc-raw-score">—</td>
+                <td class="col-clean" id="rc-clean-score">—</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="dup-badge" id="graph-dup-badge"></div>
+          <div id="rel-card" style="display:none;margin-top:12px">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Relation Breakdown</div>
+            <div class="rel-bar-wrap" id="rel-bars"></div>
+          </div>
+        </div>
+
+        <!-- ── TREE STATS — raw vs clean ── -->
+        <div class="card" id="card-stats-tree">
+          <div class="card-title">
+            Tree Stats
+            <span class="card-title-legend">
+              <span style="color:var(--contrary)">■ Raw</span>
+              <span style="color:var(--green)">■ Clean</span>
+            </span>
+          </div>
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th class="col-label"></th>
+                <th class="col-raw">Raw</th>
+                <th class="col-clean">Clean</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="col-label">Claims</td>
+                <td class="col-raw"   id="trc-raw-claims">—</td>
+                <td class="col-clean" id="trc-clean-claims">—</td>
+              </tr>
+              <tr>
+                <td class="col-label">Bodies</td>
+                <td class="col-raw"   id="trc-raw-bodies">—</td>
+                <td class="col-clean" id="trc-clean-bodies">—</td>
+              </tr>
+              <tr>
+                <td class="col-label">Attackers</td>
+                <td class="col-raw"   id="trc-raw-attackers">—</td>
+                <td class="col-clean" id="trc-clean-attackers">—</td>
+              </tr>
+              <tr>
+                <td class="col-label">Total Rows</td>
+                <td class="col-raw"   id="trc-raw-rows">—</td>
+                <td class="col-clean" id="trc-clean-rows">—</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="dup-badge" id="tree-dup-badge"></div>
+          <div id="tree-rel-card" style="display:none;margin-top:12px">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Relation Breakdown</div>
+            <div class="rel-bar-wrap" id="tree-rel-bars"></div>
+          </div>
+          <div id="ts-mode-info" style="margin-top:10px;font-size:11px;color:var(--text-faint);line-height:1.6;text-align:center"></div>
+        </div>
+
+        <!-- ── GRAPH FILTERS ── -->
+        <div class="card" id="card-filter-graph">
+          <div class="card-title">Graph Filters</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="control">
+              <div class="control-label">Relation Type</div>
+              <select id="filter-relation" onchange="fetchGraph()"><option value="all">All relations</option></select>
+            </div>
+            <div class="control">
+              <div class="control-label">Search Entity</div>
+              <input type="text" id="filter-search" placeholder="type to filter nodes..." oninput="debounceGraph()">
+            </div>
+            <div class="slider-wrap">
+              <div class="slider-header"><div class="control-label">Min Score</div><div class="slider-val" id="score-val">0.00</div></div>
+              <input type="range" id="filter-score" min="0" max="1" step="0.01" value="0"
+                     oninput="document.getElementById('score-val').textContent=parseFloat(this.value).toFixed(2);debounceGraph()">
+            </div>
+            <div class="control">
+              <div class="control-label">Max Edges</div>
+              <select id="filter-limit" onchange="fetchGraph()">
+                <option value="-1">All edges</option>
+                <option value="100">100</option><option value="200">200</option>
+                <option value="300" selected>300</option><option value="500">500</option><option value="1000">1000</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TREE FILTERS ── -->
+        <div class="card" id="card-filter-tree">
+          <div class="card-title">Tree Filters</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="control">
+              <div class="control-label">Claim</div>
+              <select id="tree-filter-claim" onchange="applyTreeFilters()">
+                <option value="all">All claims</option>
+                <option>good_staff</option><option>bad_staff</option>
+                <option>good_price</option><option>bad_price</option>
+                <option>good_check-in</option><option>bad_check-in</option>
+                <option>good_check-out</option><option>bad_check-out</option>
+              </select>
+            </div>
+            <div class="control">
+              <div class="control-label">Relation Type</div>
+              <select id="tree-filter-relation" onchange="applyTreeFilters()">
+                <option value="all">All relations</option>
+                <option value="SUPPORT">SUPPORT</option>
+                <option value="CONTRARY_TO">CONTRARY_TO</option>
+                <option value="NOT_CONTRARY">NOT_CONTRARY</option>
+              </select>
+            </div>
+            <div class="control">
+              <div class="control-label">Search Node</div>
+              <input type="text" id="tree-filter-search" placeholder="filter nodes..." oninput="debounceTreeFilter()">
+            </div>
+            <div id="full-mode-sliders" style="display:none;flex-direction:column;gap:10px">
+              <div class="slider-wrap">
+                <div class="slider-header"><div class="control-label">Max Bodies / Claim</div><div class="slider-val" id="tree-body-val">50</div></div>
+                <input type="range" id="tree-filter-bodies" min="1" max="1000" step="1" value="50"
+                       oninput="document.getElementById('tree-body-val').textContent=this.value;debounceTreeFilter()">
+              </div>
+              <div class="slider-wrap">
+                <div class="slider-header"><div class="control-label">Max Attackers / Body</div><div class="slider-val" id="tree-atk-val">20</div></div>
+                <input type="range" id="tree-filter-attackers" min="1" max="1000" step="1" value="20"
+                       oninput="document.getElementById('tree-atk-val').textContent=this.value;debounceTreeFilter()">
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <div id="btn-bundled-mode" class="toggle-btn active" style="flex:1;text-align:center" onclick="setViewMode('bundled')">Bundled</div>
+              <div id="btn-full-mode" class="toggle-btn" style="flex:1;text-align:center" onclick="setViewMode('full')">Full Tree</div>
+            </div>
+            <div id="btn-show-full-tree" class="toggle-btn warn" style="display:none;text-align:center" onclick="showFullTree()">⚠ Load All Edges (may lag)</div>
+          </div>
+        </div>
+
+        <!-- ── LEGEND ── -->
+        <div class="card">
+          <div class="card-title">Legend</div>
+          <div class="legend">
+            <div class="legend-divider">Relations</div>
+            <div class="legend-item"><span class="legend-solid" style="background:var(--contrary)"></span>CONTRARY_TO</div>
+            <div class="legend-item"><span class="legend-solid" style="background:var(--not-contrary)"></span>NOT_CONTRARY</div>
+            <div class="legend-item"><span class="legend-solid" style="background:var(--support)"></span>SUPPORT</div>
+            <div class="legend-divider">Graph View</div>
+            <div class="legend-item"><span class="legend-solid circle" style="background:var(--bg3);border:1.5px solid var(--text-dim)"></span>Entity node</div>
+            <div class="legend-item"><span class="legend-solid circle" style="background:var(--contrary);opacity:.7"></span>Selected/highlighted</div>
+            <div class="legend-divider">Tree View — Bundled</div>
+            <div class="legend-item"><span class="legend-solid circle" style="background:rgba(152,240,200,.15);border:2px solid var(--cyan)"></span>Claim — drag to move</div>
+            <div class="legend-item"><span class="legend-solid circle" style="background:rgba(214,176,76,.1);border:1.5px solid var(--amber)"></span>Body — click to expand</div>
+            <div class="legend-item"><span style="font-size:9px;font-weight:700;color:var(--contrary);margin-right:4px">━━</span>Bundle (thick = more attackers)</div>
+            <div class="legend-divider">Tree View — Full</div>
+            <div class="legend-item"><span class="legend-solid circle" style="background:rgba(255,110,199,.1);border:1.5px solid var(--contrary)"></span>CONTRARY attacker</div>
+            <div class="legend-item"><span class="legend-solid circle" style="background:rgba(152,240,200,.06);border:1.5px solid var(--not-contrary)"></span>NOT_CONTRARY attacker</div>
+            <div class="legend-item"><span style="font-size:10px;opacity:.5;margin-right:2px">- - -</span>Cross-tree attack</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CANVAS AREA ── -->
+    <div class="canvas-area">
+      <div class="canvas-toolbar">
+        <div class="tab-group">
+          <div class="tab active" id="tab-graph" onclick="switchTab('graph')">Graph View</div>
+          <div class="tab"        id="tab-tree"  onclick="switchTab('tree')">Tree View</div>
+        </div>
+        <div id="graph-toolbar-extras" style="display:flex;align-items:center;gap:8px">
+          <div class="count-badge" id="edge-count">0 edges · 0 nodes</div>
+          <div class="toggle-btn" id="btn-raw-toggle" onclick="toggleRawData()" title="Toggle raw vs clean graph data">Show Raw</div>
+          <div class="raw-banner" id="raw-banner">RAW — includes duplicates</div>
+        </div>
+        <div id="tree-toolbar-extras" style="display:none;align-items:center;gap:8px">
+          <div class="count-badge" id="tree-node-count">—</div>
+          <div class="toggle-btn active" id="btn-cross" onclick="toggleCrossTree()">Cross-tree</div>
+          <div class="count-badge" id="tree-mode-badge" style="color:var(--cyan)">Bundled</div>
+        </div>
+        <div class="toolbar-right">
+          <div class="icon-btn" onclick="handleReset()" title="Reset view">⟳</div>
+          <div class="icon-btn" onclick="handleZoomIn()"  title="Zoom in">+</div>
+          <div class="icon-btn" onclick="handleZoomOut()" title="Zoom out">−</div>
+        </div>
+      </div>
+
+      <div class="graph-wrap" id="graph-wrap">
+        <canvas id="graph-canvas"></canvas>
+
+        <div id="tree-canvas-wrap">
+          <canvas id="tree-canvas"></canvas>
+          <div class="empty-state" id="tree-empty-state">
+            <div class="empty-text">
+              Upload <strong>aba_tree_structure.csv</strong> to view argument trees.<br><br>
+              <strong>Bundled mode</strong> — smooth, all 8 trees visible.<br>
+              Click any body node to expand its individual attackers.<br>
+              Drag any claim node to move the whole tree.<br><br>
+              <strong>Full Tree mode</strong> — shows individual attacker nodes.<br>
+              Use filters to limit scope.
+            </div>
+          </div>
+          <div id="tree-tooltip"></div>
+          <div class="info-panel right" id="tree-node-panel">
+            <div class="panel-close" onclick="closeTreeNodePanel()">✕</div>
+            <div class="panel-title" id="tnp-name"></div>
+            <div class="panel-row"><span>Type</span><span id="tnp-type"></span></div>
+            <div class="panel-row"><span>Claim tree</span><span id="tnp-claim"></span></div>
+            <div class="panel-row"><span>Score</span><span id="tnp-score"></span></div>
+            <div class="panel-row"><span>Connections</span><span id="tnp-deg"></span></div>
+            <div id="tnp-bundle-info" style="display:none">
+              <div style="margin-top:8px;font-size:10px;color:var(--text-faint);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Attacker breakdown</div>
+              <div class="bundle-bar" id="tnp-bundle-bar"></div>
+              <div style="font-size:10px;color:var(--text-dim)" id="tnp-bundle-counts"></div>
+            </div>
+            <div id="tnp-expand-btn" class="panel-action-btn" style="display:none" onclick="toggleBodyExpand(currentPanelBodyKey)">▼ Expand attackers</div>
+          </div>
+          <div class="info-panel left" id="tree-edge-panel">
+            <div class="panel-close" onclick="closeTreeEdgePanel()">✕</div>
+            <div class="panel-relation" id="tep-relation"></div>
+            <div class="panel-nodes">
+              <div class="panel-node-tag" id="tep-source"></div>
+              <div class="panel-arrow">→</div>
+              <div class="panel-node-tag" id="tep-target"></div>
+            </div>
+            <div class="panel-score-row"><span>Score</span><span id="tep-score"></span></div>
+            <div class="panel-row" id="tep-bundle-row" style="display:none"><span>Bundle represents</span><span id="tep-bundle-count" style="color:var(--cyan)"></span></div>
+          </div>
+        </div>
+
+        <div class="empty-state" id="empty-state">
+          <div class="empty-text">Upload visualization_data.csv to display the Knowledge Graph.</div>
+        </div>
+        <div class="loading" id="loading"><div class="spinner"></div><span id="loading-text">Loading...</span></div>
+        <div class="tooltip" id="tooltip"></div>
+
+        <div class="info-panel right" id="node-panel">
+          <div class="panel-close" onclick="closeNodePanel()">✕</div>
+          <div class="panel-title" id="np-name"></div>
+          <div class="panel-row"><span>Degree</span><span id="np-degree"></span></div>
+          <div class="panel-row"><span>Relations</span><span id="np-rels"></span></div>
+          <div class="panel-row"><span>Avg score</span><span id="np-score"></span></div>
+        </div>
+        <div class="info-panel left" id="edge-panel">
+          <div class="panel-close" onclick="closeEdgePanel()">✕</div>
+          <div class="panel-relation" id="ep-relation"></div>
+          <div class="panel-nodes">
+            <div class="panel-node-tag" id="ep-source"></div>
+            <div class="panel-arrow">→</div>
+            <div class="panel-node-tag" id="ep-target"></div>
+          </div>
+          <div class="panel-score-row"><span>Score</span><span id="ep-score"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/graph-visualizer/api';
+const C = {
+  contrary:'#ff6ec7', notContrary:'#98f0c8', support:'#cfff04',
+  nodeBg:'#133535aa', nodeStroke:'#98f0c833',
+  labelDim:'#a89e82', labelHi:'#f7f0df',
+  gold:'#d6b04c', amber:'#d6b04c', cyan:'#98f0c8', bg:'#071515'
+};
+function edgeColor(rel){
+  if(rel==='CONTRARY_TO') return C.contrary;
+  if(rel==='NOT_CONTRARY') return C.notContrary;
+  if(rel==='SUPPORT') return C.support;
+  return C.notContrary;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RAW / CLEAN TOGGLE (graph view)
+// ═══════════════════════════════════════════════════════════════
+let showRawData = false;
+
+function toggleRawData() {
+  showRawData = !showRawData;
+  const btn    = document.getElementById('btn-raw-toggle');
+  const banner = document.getElementById('raw-banner');
+  btn.classList.toggle('raw-active', showRawData);
+  btn.textContent = showRawData ? 'Show Clean' : 'Show Raw';
+  banner.classList.toggle('show', showRawData);
+  fetchGraph();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GRAPH STATS RENDERER
+// ═══════════════════════════════════════════════════════════════
+function renderGraphStats(raw, clean, duplicates) {
+  const fmt      = v => (v != null) ? v.toLocaleString() : '—';
+  const fmtScore = v => (v != null) ? parseFloat(v).toFixed(4) : '—';
+
+  document.getElementById('rc-raw-triples').textContent    = fmt(raw.triples);
+  document.getElementById('rc-clean-triples').textContent  = fmt(clean.triples);
+  document.getElementById('rc-raw-entities').textContent   = fmt(raw.entities);
+  document.getElementById('rc-clean-entities').textContent = fmt(clean.entities);
+  document.getElementById('rc-raw-relations').textContent  = fmt(raw.relations);
+  document.getElementById('rc-clean-relations').textContent= fmt(clean.relations);
+  document.getElementById('rc-raw-score').textContent      = fmtScore(raw.avg_score);
+  document.getElementById('rc-clean-score').textContent    = fmtScore(clean.avg_score);
+
+  const badge = document.getElementById('graph-dup-badge');
+  if (duplicates > 0) {
+    const pct = ((duplicates / raw.triples) * 100).toFixed(1);
+    badge.textContent   = `${duplicates.toLocaleString()} duplicates removed (${pct}%)`;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // relation bars
+  const card = document.getElementById('rel-card');
+  const bars = document.getElementById('rel-bars');
+  if (card) card.style.display = 'block';
+  if (!bars) return;
+  bars.innerHTML = '';
+  const allRels = new Set([...Object.keys(raw.rel_counts), ...Object.keys(clean.rel_counts)]);
+  const maxVal  = Math.max(...Object.values(raw.rel_counts));
+  allRels.forEach(rel => {
+    const rawCnt   = raw.rel_counts[rel]   || 0;
+    const cleanCnt = clean.rel_counts[rel] || 0;
+    const diff     = rawCnt - cleanCnt;
+    const col      = edgeColor(rel);
+    const rawPct   = (rawCnt   / maxVal * 100).toFixed(1);
+    const cleanPct = (cleanCnt / maxVal * 100).toFixed(1);
+    const div = document.createElement('div');
+    div.className = 'rel-bar-row';
+    div.innerHTML = `
+      <div class="rel-bar-label">
+        <span class="rel-name" style="color:${col}">${rel}</span>
+        <span class="rel-counts">
+          <span style="color:var(--contrary)">${rawCnt.toLocaleString()}</span>
+          <span style="color:var(--text-faint)">→</span>
+          <span style="color:var(--green)">${cleanCnt.toLocaleString()}</span>
+          ${diff > 0 ? `<span style="color:var(--amber)">(-${diff})</span>` : ''}
+        </span>
+      </div>
+      <div class="rel-track">
+        <div class="rel-fill-raw"   style="width:${rawPct}%;background:${col}"></div>
+        <div class="rel-fill-clean" style="width:${cleanPct}%;background:${col}"></div>
+      </div>`;
+    bars.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TREE STATS RENDERER
+// ═══════════════════════════════════════════════════════════════
+function renderTreeStats(raw, clean, duplicates) {
+  const fmt = v => (v != null) ? v.toLocaleString() : '—';
+
+  // clean column
+  document.getElementById('trc-clean-claims').textContent    = fmt(clean?.claims);
+  document.getElementById('trc-clean-bodies').textContent    = fmt(clean?.bodies);
+  document.getElementById('trc-clean-attackers').textContent = fmt(clean?.attackers);
+  document.getElementById('trc-clean-rows').textContent      = fmt(clean?.total_rows);
+
+  // raw column
+  document.getElementById('trc-raw-claims').textContent    = raw ? fmt(raw.claims)     : '—';
+  document.getElementById('trc-raw-bodies').textContent    = raw ? fmt(raw.bodies)     : '—';
+  document.getElementById('trc-raw-attackers').textContent = raw ? fmt(raw.attackers)  : '—';
+  document.getElementById('trc-raw-rows').textContent      = raw ? fmt(raw.total_rows) : '—';
+
+  // duplicates badge
+  const badge = document.getElementById('tree-dup-badge');
+  if (raw && duplicates > 0) {
+    const pct = ((duplicates / raw.total_rows) * 100).toFixed(1);
+    badge.textContent   = `${duplicates.toLocaleString()} duplicates removed (${pct}%)`;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // relation breakdown bars
+  if (!clean) return;
+  const card = document.getElementById('tree-rel-card');
+  const bars = document.getElementById('tree-rel-bars');
+  if (card) card.style.display = 'block';
+  if (!bars) return;
+  bars.innerHTML = '';
+
+  const relData = [
+    { rel:'CONTRARY_TO',  rawCnt: raw?.contrary_count     || 0, cleanCnt: clean.contrary_count },
+    { rel:'NOT_CONTRARY', rawCnt: raw?.not_contrary_count || 0, cleanCnt: clean.not_contrary_count },
+    { rel:'SUPPORT',      rawCnt: raw?.support_count      || 0, cleanCnt: clean.support_count },
+  ];
+  const maxVal = Math.max(...relData.map(r => Math.max(r.rawCnt, r.cleanCnt)), 1);
+
+  relData.forEach(({ rel, rawCnt, cleanCnt }) => {
+    const col      = edgeColor(rel);
+    const rawPct   = (rawCnt   / maxVal * 100).toFixed(1);
+    const cleanPct = (cleanCnt / maxVal * 100).toFixed(1);
+    const diff     = rawCnt - cleanCnt;
+    const div = document.createElement('div');
+    div.className = 'rel-bar-row';
+    div.innerHTML = `
+      <div class="rel-bar-label">
+        <span class="rel-name" style="color:${col}">${rel}</span>
+        <span class="rel-counts">
+          ${raw ? `<span style="color:var(--contrary)">${rawCnt.toLocaleString()}</span>
+          <span style="color:var(--text-faint)">→</span>` : ''}
+          <span style="color:var(--green)">${cleanCnt.toLocaleString()}</span>
+          ${raw && diff > 0 ? `<span style="color:var(--amber)">(-${diff})</span>` : ''}
+        </span>
+      </div>
+      <div class="rel-track">
+        ${raw ? `<div class="rel-fill-raw" style="width:${rawPct}%;background:${col}"></div>` : ''}
+        <div class="rel-fill-clean" style="width:${cleanPct}%;background:${col}"></div>
+      </div>`;
+    bars.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB & SHARED
+// ═══════════════════════════════════════════════════════════════
+let currentTab = 'graph';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-graph').classList.toggle('active', tab==='graph');
+  document.getElementById('tab-tree').classList.toggle('active',  tab==='tree');
+  document.getElementById('graph-canvas').style.display        = tab==='graph' ? 'block' : 'none';
+  document.getElementById('tree-canvas-wrap').style.display    = tab==='tree'  ? 'block' : 'none';
+  document.getElementById('graph-toolbar-extras').style.display = tab==='graph' ? 'flex' : 'none';
+  document.getElementById('tree-toolbar-extras').style.display  = tab==='tree'  ? 'flex' : 'none';
+  ['card-upload-graph','card-stats-graph','card-filter-graph'].forEach(id =>
+    document.getElementById(id).style.display = tab==='graph' ? 'block' : 'none');
+  ['card-upload-tree','card-stats-tree','card-filter-tree'].forEach(id =>
+    document.getElementById(id).style.display = tab==='tree' ? 'block' : 'none');
+  const es = document.getElementById('empty-state');
+  if (es) es.style.display = (tab==='graph' && !G.nodes.length) ? 'flex' : 'none';
+  if (tab==='tree' && treeRawData) {
+    document.getElementById('tree-empty-state').style.display = 'none';
+    setTimeout(() => { buildTreeLayout(); treeDraw(); }, 30);
+  }
+}
+function handleReset()   { currentTab==='graph' ? resetView()  : resetTreeView(); }
+function handleZoomIn()  { currentTab==='graph' ? zoomBy(1.2)  : treeZoomBy(1.2); }
+function handleZoomOut() { currentTab==='graph' ? zoomBy(0.83) : treeZoomBy(0.83); }
+function setLoading(on, msg='Loading...') {
+  document.getElementById('loading').classList.toggle('show', on);
+  document.getElementById('loading-text').textContent = msg;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GRAPH VIEW
+// ═══════════════════════════════════════════════════════════════
+let G={nodes:[],edges:[]}, transform={x:0,y:0,scale:1};
+let pos={}, ectrl={}, drag=null, mouseDown0=null;
+let hoverNode=null, hoverEdge=null, selNode=null, selEdge=null;
+let simActive=false, debTimer=null, needsRedraw=false;
+
+async function handleUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  setLoading(true);
+  const form = new FormData(); form.append('file', file);
+  try {
+    const r = await fetch(`${API}/upload`, {method:'POST', body:form});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Upload failed');
+    document.getElementById('status-dot').classList.add('live');
+    document.getElementById('status-text').textContent = `${d.rows.toLocaleString()} triples loaded`;
+    document.getElementById('upload-zone').classList.add('loaded');
+    document.getElementById('upload-label-main').textContent = file.name;
+    document.getElementById('upload-label-sub').textContent  =
+      `${d.rows.toLocaleString()} triples · ${d.entities.toLocaleString()} entities`;
+    renderGraphStats(d.raw, d.clean, d.duplicates);
+    populateRelFilter(Object.keys(d.rel_counts));
+    document.getElementById('empty-state').style.display = 'none';
+    await fetchGraph();
+  } catch(e) { alert(`Upload error: ${e.message}`); }
+  finally { setLoading(false); }
+}
+
+async function fetchStats() {
+  try {
+    const d = await (await fetch(`${API}/stats`)).json();
+    if (d.clean && d.raw) renderGraphStats(d.raw, d.clean, d.duplicates);
+  } catch(e) { console.warn('fetchStats failed:', e); }
+}
+
+function populateRelFilter(rels) {
+  const sel = document.getElementById('filter-relation');
+  sel.innerHTML = '<option value="all">All relations</option>';
+  rels.forEach(r => { const o=document.createElement('option'); o.value=r; o.textContent=r; sel.appendChild(o); });
+}
+
+async function fetchGraph() {
+  setLoading(true);
+  try {
+    const p = new URLSearchParams({
+      relation:  document.getElementById('filter-relation').value,
+      min_score: document.getElementById('filter-score').value,
+      search:    document.getElementById('filter-search').value,
+      limit:     document.getElementById('filter-limit').value,
+      show_raw:  showRawData,
+    });
+    const d = await (await fetch(`${API}/graph?${p}`)).json();
+    G = d;
+    document.getElementById('edge-count').textContent =
+      `${d.edges.length.toLocaleString()} edges · ${d.nodes.length.toLocaleString()} nodes`;
+    selNode=null; selEdge=null; closeNodePanel(); closeEdgePanel();
+    initPos();
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+function debounceGraph(){clearTimeout(debTimer);debTimer=setTimeout(fetchGraph,400);}
+function initPos(){const cv=document.getElementById('graph-canvas');const W=cv.offsetWidth||800,H=cv.offsetHeight||600,PAD=100;const nodes=G.nodes;if(!nodes.length)return;const xs=nodes.map(n=>n.x),ys=nodes.map(n=>n.y);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);const rx=x1-x0||1,ry=y1-y0||1;pos={};nodes.forEach(n=>{pos[n.id]={x:PAD+((n.x-x0)/rx)*(W-PAD*2)+(Math.random()-.5)*40,y:PAD+((n.y-y0)/ry)*(H-PAD*2)+(Math.random()-.5)*40,vx:0,vy:0};});ectrl={};transform={x:0,y:0,scale:1};if(G.nodes.length>300){simActive=false;draw();}else{runSim(180);}}
+function runSim(maxTicks){simActive=true;let ticks=0;function tick(){if(!simActive||ticks++>=maxTicks){simActive=false;draw();return;}applyForces();requestAnimationFrame(tick);}tick();}
+function applyForces(){const cv=document.getElementById('graph-canvas');const W=cv.offsetWidth||800,H=cv.offsetHeight||600;const REPEL=6000,ATT=0.004,DAMP=0.75,CEN=0.002,MIN=150;G.nodes.forEach(a=>{const pa=pos[a.id];if(!pa)return;if(drag&&drag.type==='node'&&drag.id===a.id)return;pa.vx+=(W/2-pa.x)*CEN;pa.vy+=(H/2-pa.y)*CEN;G.nodes.forEach(b=>{if(a.id===b.id)return;const pb=pos[b.id];if(!pb)return;const dx=pa.x-pb.x,dy=pa.y-pb.y;const d=Math.sqrt(dx*dx+dy*dy)||.01;const f=d<MIN?REPEL*4/(d*d):REPEL/(d*d);pa.vx+=(dx/d)*f;pa.vy+=(dy/d)*f;});});G.edges.forEach(e=>{const ps=pos[e.source],pt=pos[e.target];if(!ps||!pt)return;const dx=pt.x-ps.x,dy=pt.y-ps.y;ps.vx+=dx*ATT;ps.vy+=dy*ATT;pt.vx-=dx*ATT;pt.vy-=dy*ATT;});G.nodes.forEach(n=>{if(drag&&drag.type==='node'&&drag.id===n.id)return;const p=pos[n.id];if(!p)return;p.vx*=DAMP;p.vy*=DAMP;p.x+=p.vx;p.y+=p.vy;p.x=Math.max(20,Math.min(W-20,p.x));p.y=Math.max(20,Math.min(H-20,p.y));});}
+function getCtrl(idx,ps,pt){if(ectrl[idx])return ectrl[idx];const mx=(ps.x+pt.x)/2,my=(ps.y+pt.y)/2,dx=pt.x-ps.x,dy=pt.y-ps.y;return{cx:mx-dy*0.3,cy:my+dx*0.3};}
+function draw(){needsRedraw=true;}
+function _draw(){const cv=document.getElementById('graph-canvas'),wrap=document.getElementById('graph-wrap'),dpr=window.devicePixelRatio||1;const W=wrap.offsetWidth,H=wrap.offsetHeight;cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);if(!G.nodes.length)return;if(simActive)applyForces();ctx.save();ctx.translate(transform.x,transform.y);ctx.scale(transform.scale,transform.scale);const nbSet=new Set(),nbRel={},selEdgeSet=new Set();if(selNode){G.edges.forEach((e,i)=>{if(e.source===selNode.id||e.target===selNode.id){selEdgeSet.add(i);const nb=e.source===selNode.id?e.target:e.source;nbSet.add(nb);nbRel[nb]=e.relation;}});}const seEndSet=new Set();if(selEdge){seEndSet.add(selEdge.edge.source);seEndSet.add(selEdge.edge.target);}const hasSel=!!(selNode||selEdge);const inView=(ps,pt)=>{const mg=100;const sx1=ps.x*transform.scale+transform.x,sy1=ps.y*transform.scale+transform.y,sx2=pt.x*transform.scale+transform.x,sy2=pt.y*transform.scale+transform.y;return!((sx1<-mg&&sx2<-mg)||(sx1>W+mg&&sx2>W+mg)||(sy1<-mg&&sy2<-mg)||(sy1>H+mg&&sy2>H+mg));};G.edges.forEach((e,idx)=>{const ps=pos[e.source],pt=pos[e.target];if(!ps||!pt)return;if(!inView(ps,pt))return;const{cx,cy}=getCtrl(idx,ps,pt),col=edgeColor(e.relation);const isSE=selEdge&&selEdge.idx===idx,isNE=selNode&&selEdgeSet.has(idx),isHov=!hasSel&&hoverEdge&&hoverEdge.idx===idx;let alpha,lw,drawCol;if(isSE){alpha=1;lw=3;drawCol=col;}else if(isNE){alpha=.95;lw=2.5;drawCol=col;}else if(isHov){alpha=.9;lw=2.5;drawCol=C.gold;}else if(hasSel){alpha=.06;lw=.8;drawCol=col;}else{alpha=.55;lw=1;drawCol=col;}ctx.globalAlpha=alpha;ctx.strokeStyle=drawCol;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(ps.x,ps.y);ctx.quadraticCurveTo(cx,cy,pt.x,pt.y);ctx.stroke();const t=.82,ax=(1-t)*(1-t)*ps.x+2*(1-t)*t*cx+t*t*pt.x,ay=(1-t)*(1-t)*ps.y+2*(1-t)*t*cy+t*t*pt.y,ang=Math.atan2(pt.y-ay,pt.x-ax);ctx.fillStyle=drawCol;ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x-9*Math.cos(ang-.35),pt.y-9*Math.sin(ang-.35));ctx.lineTo(pt.x-9*Math.cos(ang+.35),pt.y-9*Math.sin(ang+.35));ctx.closePath();ctx.fill();if(isSE||isNE||isHov){ctx.globalAlpha=1;ctx.font='600 11px Inter,sans-serif';const tw=ctx.measureText(e.relation).width;ctx.fillStyle=C.bg;ctx.beginPath();ctx.roundRect(cx-tw/2-5,cy-10,tw+10,18,4);ctx.fill();ctx.fillStyle=isHov?C.gold:drawCol;ctx.fillText(e.relation,cx-tw/2,cy+4);}if(isSE||isHov){ctx.globalAlpha=1;ctx.beginPath();ctx.arc(cx,cy,6,0,Math.PI*2);ctx.fillStyle=C.gold;ctx.fill();ctx.strokeStyle=C.bg;ctx.lineWidth=1.5;ctx.stroke();}ctx.globalAlpha=1;});G.nodes.forEach(n=>{const p=pos[n.id];if(!p)return;const isHov=!hasSel&&hoverNode&&hoverNode.id===n.id,isSel=selNode&&selNode.id===n.id,isNb=selNode&&nbSet.has(n.id),isEEnd=selEdge&&seEndSet.has(n.id),isDrag=drag&&drag.type==='node'&&drag.id===n.id;const r=6+Math.min(n.degree*1.5,14),dimmed=hasSel&&!isSel&&!isNb&&!isEEnd;ctx.globalAlpha=dimmed?.06:1;if(isSel||isNb||isEEnd||isDrag||isHov){ctx.globalAlpha=1;const gr=ctx.createRadialGradient(p.x,p.y,r*.5,p.x,p.y,r+14);let gc;if(isDrag)gc=[152,240,200,.7];else if(isSel)gc=[214,176,76,.8];else if(isEEnd){const ee=selEdge.edge.relation==='CONTRARY_TO';gc=ee?[180,20,20,.75]:[100,230,180,.75];}else if(isNb){const nb=nbRel[n.id]==='CONTRARY_TO';gc=nb?[180,20,20,.7]:[100,230,180,.7];}else gc=[214,176,76,.4];gr.addColorStop(0,`rgba(${gc[0]},${gc[1]},${gc[2]},${gc[3]})`);gr.addColorStop(1,'transparent');ctx.beginPath();ctx.arc(p.x,p.y,r+14,0,Math.PI*2);ctx.fillStyle=gr;ctx.fill();}if(isSel||isNb||isEEnd)ctx.globalAlpha=1;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);let fill=C.nodeBg;if(isSel)fill='rgba(214,176,76,.25)';if(isEEnd)fill=selEdge.edge.relation==='CONTRARY_TO'?'rgba(180,20,20,.2)':'rgba(100,230,180,.15)';ctx.fillStyle=fill;ctx.fill();let sc=C.nodeStroke,sw=1;if(isDrag){sc=C.notContrary;sw=2;}else if(isSel){sc=C.gold;sw=2.5;}else if(isEEnd){sc=selEdge.edge.relation==='CONTRARY_TO'?C.contrary:C.notContrary;sw=2;}else if(isNb){sc=nbRel[n.id]==='CONTRARY_TO'?C.contrary:C.notContrary;sw=2;}else if(isHov){sc=C.gold;sw=2;}ctx.strokeStyle=sc;ctx.lineWidth=sw;ctx.stroke();const lbl=n.id.length>20?n.id.slice(0,19)+'…':n.id;ctx.font=`${isSel||isHov?'500':'400'} 10px Inter,sans-serif`;const tw=ctx.measureText(lbl).width,lx=p.x+r+5,ly=p.y+4;ctx.globalAlpha=dimmed?.06:.8;ctx.fillStyle=C.bg;ctx.beginPath();ctx.roundRect(lx-2,ly-10,tw+6,14,3);ctx.fill();ctx.globalAlpha=dimmed?.06:1;ctx.fillStyle=isSel||isHov?C.labelHi:C.labelDim;ctx.fillText(lbl,lx,ly);ctx.globalAlpha=1;});ctx.restore();}
+function toW(ex,ey){return{x:(ex-transform.x)/transform.scale,y:(ey-transform.y)/transform.scale};}
+function nodeAt(mx,my){const{x,y}=toW(mx,my);for(const n of G.nodes){const p=pos[n.id];if(!p)continue;if(Math.hypot(p.x-x,p.y-y)<6+Math.min(n.degree*1.5,14)+7)return n;}return null;}
+function edgeAt(mx,my){const{x,y}=toW(mx,my);const thr=Math.max(7,7/transform.scale);for(let i=0;i<G.edges.length;i++){const e=G.edges[i];const ps=pos[e.source],pt=pos[e.target];if(!ps||!pt)continue;const{cx,cy}=getCtrl(i,ps,pt);for(let t=0;t<=1;t+=.04){const bx=(1-t)*(1-t)*ps.x+2*(1-t)*t*cx+t*t*pt.x,by=(1-t)*(1-t)*ps.y+2*(1-t)*t*cy+t*t*pt.y;if(Math.hypot(bx-x,by-y)<thr)return{edge:e,idx:i};}}return null;}
+function handleAt(mx,my){const{x,y}=toW(mx,my);const check=e=>{if(!e)return null;const ps=pos[e.edge.source],pt=pos[e.edge.target];if(!ps||!pt)return null;const{cx,cy}=getCtrl(e.idx,ps,pt);return Math.hypot(cx-x,cy-y)<14/transform.scale?e:null;};return check(selEdge)||check(hoverEdge);}
+const cv=document.getElementById('graph-canvas');
+cv.addEventListener('mousedown',ev=>{if(currentTab!=='graph')return;mouseDown0={x:ev.offsetX,y:ev.offsetY};const wp=toW(ev.offsetX,ev.offsetY);const h=handleAt(ev.offsetX,ev.offsetY);if(h){const{cx,cy}=getCtrl(h.idx,pos[h.edge.source],pos[h.edge.target]);drag={type:'edge',idx:h.idx,ox:wp.x-cx,oy:wp.y-cy};cv.style.cursor='grabbing';return;}const nd=nodeAt(ev.offsetX,ev.offsetY);if(nd){drag={type:'node',id:nd.id,ox:wp.x-pos[nd.id].x,oy:wp.y-pos[nd.id].y};cv.style.cursor='grabbing';return;}drag={type:'pan',sx:ev.offsetX-transform.x,sy:ev.offsetY-transform.y};cv.style.cursor='grabbing';});
+cv.addEventListener('mousemove',ev=>{if(currentTab!=='graph')return;const wp=toW(ev.offsetX,ev.offsetY);if(drag){if(drag.type==='edge'){ectrl[drag.idx]={cx:wp.x-drag.ox,cy:wp.y-drag.oy};draw();return;}if(drag.type==='node'){const p=pos[drag.id];p.x=wp.x-drag.ox;p.y=wp.y-drag.oy;p.vx=0;p.vy=0;draw();return;}if(drag.type==='pan'){transform.x=ev.offsetX-drag.sx;transform.y=ev.offsetY-drag.sy;draw();return;}}hoverNode=nodeAt(ev.offsetX,ev.offsetY);hoverEdge=hoverNode?null:edgeAt(ev.offsetX,ev.offsetY);if(hoverNode)cv.style.cursor='pointer';else if(handleAt(ev.offsetX,ev.offsetY))cv.style.cursor='grab';else if(hoverEdge)cv.style.cursor='pointer';else cv.style.cursor='grab';const tip=document.getElementById('tooltip');if(hoverNode){const edges=G.edges.filter(e=>e.source===hoverNode.id||e.target===hoverNode.id);const avg=edges.length?(edges.reduce((s,e)=>s+e.score,0)/edges.length).toFixed(3):'—';const rels=[...new Set(edges.map(e=>e.relation))].join(', ');tip.innerHTML=`<div class="tooltip-head">${hoverNode.id}</div><div class="tooltip-row"><span>Degree</span><span class="tooltip-val">${hoverNode.degree}</span></div><div class="tooltip-row"><span>Relations</span><span class="tooltip-val">${rels||'—'}</span></div><div class="tooltip-row"><span>Avg score</span><span class="tooltip-val">${avg}</span></div>`;tip.style.left=(ev.offsetX+14)+'px';tip.style.top=(ev.offsetY-10)+'px';tip.classList.add('show');}else if(hoverEdge){const col=edgeColor(hoverEdge.edge.relation);tip.innerHTML=`<div class="tooltip-head" style="color:${col}">${hoverEdge.edge.relation}</div><div class="tooltip-row"><span>${hoverEdge.edge.source}</span></div><div class="tooltip-row"><span>→</span><span class="tooltip-val">${hoverEdge.edge.target}</span></div><div class="tooltip-row"><span>Score</span><span class="tooltip-val">${hoverEdge.edge.score}</span></div>`;tip.style.left=(ev.offsetX+14)+'px';tip.style.top=(ev.offsetY-10)+'px';tip.classList.add('show');}else{tip.classList.remove('show');}if(!simActive)draw();});
+cv.addEventListener('mouseup',ev=>{if(currentTab!=='graph')return;const moved=mouseDown0&&(Math.abs(ev.offsetX-mouseDown0.x)>6||Math.abs(ev.offsetY-mouseDown0.y)>6);drag=null;cv.style.cursor='grab';if(!moved){const nd=nodeAt(ev.offsetX,ev.offsetY);const eh=nd?null:edgeAt(ev.offsetX,ev.offsetY);if(nd){selNode=(selNode&&selNode.id===nd.id)?null:nd;selEdge=null;closeEdgePanel();selNode?showNodePanel(selNode):closeNodePanel();}else if(eh){selEdge=(selEdge&&selEdge.idx===eh.idx)?null:eh;selNode=null;closeNodePanel();selEdge?showEdgePanel(selEdge.edge):closeEdgePanel();}else{selNode=null;selEdge=null;closeNodePanel();closeEdgePanel();}draw();}mouseDown0=null;});
+cv.addEventListener('mouseleave',()=>{drag=null;hoverNode=null;hoverEdge=null;document.getElementById('tooltip').classList.remove('show');});
+cv.addEventListener('wheel',ev=>{if(currentTab!=='graph')return;ev.preventDefault();const f=ev.deltaY<0?1.1:.91;transform.x=ev.offsetX-f*(ev.offsetX-transform.x);transform.y=ev.offsetY-f*(ev.offsetY-transform.y);transform.scale=Math.max(.04,Math.min(12,transform.scale*f));draw();},{passive:false});
+function zoomBy(f){const wrap=document.getElementById('graph-wrap');const cx=wrap.offsetWidth/2,cy=wrap.offsetHeight/2;transform.x=cx-f*(cx-transform.x);transform.y=cy-f*(cy-transform.y);transform.scale=Math.max(.04,Math.min(12,transform.scale*f));draw();}
+function resetView(){selNode=null;selEdge=null;closeNodePanel();closeEdgePanel();initPos();}
+function showNodePanel(nd){const edges=G.edges.filter(e=>e.source===nd.id||e.target===nd.id);const avg=edges.length?(edges.reduce((s,e)=>s+e.score,0)/edges.length).toFixed(3):'—';const rels=[...new Set(edges.map(e=>e.relation))].join(', ');document.getElementById('np-name').textContent=nd.id;document.getElementById('np-degree').textContent=nd.degree;document.getElementById('np-rels').textContent=rels||'—';document.getElementById('np-score').textContent=avg;document.getElementById('node-panel').classList.add('show');}
+function closeNodePanel(){document.getElementById('node-panel').classList.remove('show');}
+function showEdgePanel(edge){const col=edgeColor(edge.relation);const el=document.getElementById('ep-relation');el.textContent=edge.relation;el.style.color=col;document.getElementById('ep-source').textContent=edge.source;document.getElementById('ep-source').title=edge.source;document.getElementById('ep-target').textContent=edge.target;document.getElementById('ep-target').title=edge.target;document.getElementById('ep-score').textContent=edge.score;document.getElementById('edge-panel').classList.add('show');}
+function closeEdgePanel(){selEdge=null;document.getElementById('edge-panel').classList.remove('show');draw();}
+function renderLoop(){if(needsRedraw&&currentTab==='graph'){needsRedraw=false;_draw();}requestAnimationFrame(renderLoop);}
+renderLoop();
+
+// ═══════════════════════════════════════════════════════════════
+// TREE VIEW
+// ═══════════════════════════════════════════════════════════════
+const TREE_CLAIMS=['good_staff','bad_staff','good_price','bad_price','good_check-in','bad_check-in','good_check-out','bad_check-out'];
+let treeRawData=null,treeFilteredData=null,treeViewMode='bundled';
+let expandedBodies=new Set(),collapsedTrees=new Set(),treeShowCross=true;
+let treeTransform={x:0,y:0,scale:1},treeDrag=null,treeMD0=null;
+let treeHover=null,treeSelNode=null,treeSelEdge=null;
+let treeNeedsRedraw=false,treeDebTimer=null;
+let currentPanelBodyKey=null,treeOffsets={},treeTransformInitialized=false,treeNodeOverrides={};
+let treeNodes={},treeEdges=[],treeCrossEdges=[],treeBounds={};
+let treeEdgeIdx={out:{},in:{}};
+
+function setViewMode(mode){
+  treeViewMode=mode;
+  document.getElementById('btn-bundled-mode').classList.toggle('active',mode==='bundled');
+  document.getElementById('btn-full-mode').classList.toggle('active',mode==='full');
+  document.getElementById('full-mode-sliders').style.display=mode==='full'?'flex':'none';
+  document.getElementById('tree-mode-badge').textContent=mode==='bundled'?'Bundled':'Full Tree';
+  document.getElementById('btn-show-full-tree').style.display=mode==='full'?'block':'none';
+  updateModeInfo();
+  if(mode==='bundled')expandedBodies.clear();
+  if(treeRawData)applyTreeFilters();
+}
+function showFullTree(){
+  const bMax=parseInt(document.getElementById('tree-filter-bodies').max)||1000;
+  const aMax=parseInt(document.getElementById('tree-filter-attackers').max)||1000;
+  document.getElementById('tree-filter-bodies').value=bMax;document.getElementById('tree-body-val').textContent=bMax;
+  document.getElementById('tree-filter-attackers').value=aMax;document.getElementById('tree-atk-val').textContent=aMax;
+  applyTreeFilters();
+}
+function updateModeInfo(){
+  const el=document.getElementById('ts-mode-info');if(!el)return;
+  el.textContent=treeViewMode==='bundled'
+    ?'Bundled mode: attackers grouped per body. Click a body node to expand individual attackers.'
+    :'Full Tree mode: individual attacker nodes shown. Use filters + single-claim selection for best performance.';
+}
+
+async function handleTreeUpload(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  setLoading(true, 'Parsing tree CSV...');
+  try {
+    // ── Send to backend for raw/clean split and stats ─────────────────────
+    const form = new FormData(); form.append('file', file);
+    const r = await fetch(`${API}/upload/tree`, {method:'POST', body:form});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Upload failed');
+
+    // update upload zone
+    document.getElementById('tree-upload-zone').classList.add('loaded');
+    document.getElementById('tree-upload-label-main').textContent = file.name;
+    document.getElementById('tree-upload-label-sub').textContent  =
+      `${d.rows.toLocaleString()} rows · ${d.claims} claims`;
+
+    // render raw vs clean tree stats table
+    renderTreeStats(d.raw, d.clean, d.duplicates);
+
+    // ── Parse file client-side for canvas drawing ─────────────────────────
+    // Canvas uses local parse (same as before) — draws from clean data
+    const text = await file.text();
+    treeRawData = parseTreeCSV(text);
+    const maxB = Math.max(...Object.values(treeRawData).map(t=>t.bodies.length));
+    const maxA = Math.max(...Object.values(treeRawData).flatMap(t=>t.bodies.map(b=>b.attackers.length)));
+    document.getElementById('tree-filter-bodies').max = maxB;
+    document.getElementById('tree-filter-attackers').max = maxA;
+    document.getElementById('tree-empty-state').style.display = 'none';
+    updateModeInfo();
+    treeTransformInitialized = false;
+    switchTab('tree');
+    applyTreeFilters();
+  } catch(e) { alert('Tree CSV error: ' + e.message); console.error(e); }
+  finally { setLoading(false); }
+}
+
+function parseTreeCSV(text){
+  const lines=text.trim().split('\n');
+  const headers=lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+  const idx={};headers.forEach((h,i)=>idx[h]=i);
+  const trees={};TREE_CLAIMS.forEach(c=>{trees[c]={claim:c,bodies:{}};});
+  for(let i=1;i<lines.length;i++){
+    const cols=parseCSVLine(lines[i]);
+    const claim=cols[idx['claim']]?.trim(),body=cols[idx['body']]?.trim();
+    if(!claim||!body||!trees[claim])continue;
+    const attacker=cols[idx['attacker']]?.trim(),attackRel=cols[idx['attack_relation']]?.trim();
+    const bodyScore=parseFloat(cols[idx['body_score']])||null,atkScore=parseFloat(cols[idx['attack_score']])||null;
+    if(!trees[claim].bodies[body])trees[claim].bodies[body]={name:body,score:bodyScore,attackers:[]};
+    const isNull=!attacker||attacker===''||attacker.toLowerCase()==='nan'||attacker.toLowerCase()==='none';
+    if(!isNull)trees[claim].bodies[body].attackers.push({name:attacker,relation:attackRel,score:atkScore});
+  }
+  TREE_CLAIMS.forEach(c=>{if(trees[c])trees[c].bodies=Object.values(trees[c].bodies);});
+  return trees;
+}
+function parseCSVLine(line){const result=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"')inQ=!inQ;else if(ch===','&&!inQ){result.push(cur);cur='';}else cur+=ch;}result.push(cur);return result;}
+
+function applyTreeFilters(){
+  if(!treeRawData)return;
+  const claimF=document.getElementById('tree-filter-claim').value;
+  const relF=document.getElementById('tree-filter-relation').value;
+  const searchF=document.getElementById('tree-filter-search').value.toLowerCase().trim();
+  const maxBodies=treeViewMode==='full'?(parseInt(document.getElementById('tree-filter-bodies').value)||50):999;
+  const maxAtk=treeViewMode==='full'?(parseInt(document.getElementById('tree-filter-attackers').value)||20):999;
+  treeFilteredData={};
+  TREE_CLAIMS.forEach(claim=>{
+    if(claimF!=='all'&&claim!==claimF)return;
+    const raw=treeRawData[claim];if(!raw)return;
+    let bodies=raw.bodies.slice(0,maxBodies);
+    bodies=bodies.map(body=>{
+      let attackers=body.attackers;
+      if(relF==='SUPPORT')attackers=[];
+      else if(relF!=='all')attackers=attackers.filter(a=>a.relation===relF);
+      if(searchF){const mB=body.name.toLowerCase().includes(searchF);const mA=attackers.some(a=>a.name.toLowerCase().includes(searchF));if(!mB&&!mA)return null;if(!mB)attackers=attackers.filter(a=>a.name.toLowerCase().includes(searchF));}
+      attackers=attackers.slice(0,maxAtk);
+      return{...body,attackers};
+    }).filter(Boolean);
+    if(relF!=='all'&&relF!=='SUPPORT')bodies=bodies.filter(b=>b.attackers.length>0);
+    if(bodies.length>0)treeFilteredData[claim]={claim,bodies};
+  });
+  buildTreeLayout();treeDraw();
+}
+function debounceTreeFilter(){clearTimeout(treeDebTimer);treeDebTimer=setTimeout(applyTreeFilters,300);}
+
+function buildTreeLayout(){
+  if(!treeFilteredData)return;
+  const wrap=document.getElementById('tree-canvas-wrap');
+  const W=wrap.offsetWidth||1400,H=wrap.offsetHeight||800;
+  treeNodes={};treeEdges=[];treeCrossEdges=[];treeBounds={};
+  const claims=TREE_CLAIMS.filter(c=>treeFilteredData[c]);
+  const COLS=Math.min(4,claims.length),ROWS=Math.ceil(claims.length/COLS);
+  const CELL_W=W/COLS,CELL_H=H/ROWS,PAD=50;
+  claims.forEach((claim,ci)=>{
+    const tree=treeFilteredData[claim];
+    const col=ci%COLS,row=Math.floor(ci/COLS);
+    const cellX=col*CELL_W,cellY=row*CELL_H,cx=cellX+CELL_W/2;
+    const collapsed=collapsedTrees.has(claim),claimKey=`claim:${claim}`;
+    const off=treeOffsets[claim]||{dx:0,dy:0};
+    const Y_CLAIM=cellY+PAD+20+off.dy,Y_BODY=cellY+PAD+140+off.dy,Y_ATK=cellY+PAD+300+off.dy;
+    const baseX=cx+off.dx;
+    treeNodes[claimKey]={x:baseX,y:Y_CLAIM,label:claim,type:'claim',claim,r:22,score:null};
+    if(collapsed){treeBounds[claim]={x:baseX-25,y:Y_CLAIM-25,w:50,h:50};return;}
+    const bodies=tree.bodies||[];
+    const BODY_SPACING=Math.min(100,Math.max(40,(CELL_W-PAD*2)/Math.max(bodies.length,1)));
+    const totalBW=BODY_SPACING*(bodies.length-1),bStartX=baseX-totalBW/2;
+    let minX=baseX-25,maxX=baseX+25,maxY=Y_CLAIM;
+    bodies.forEach((body,bi)=>{
+      const bx=bStartX+bi*BODY_SPACING,by=Y_BODY,bKey=`body:${claim}:${body.name}`;
+      const ctCount=body.attackers.filter(a=>a.relation==='CONTRARY_TO').length;
+      const ncCount=body.attackers.filter(a=>a.relation==='NOT_CONTRARY').length;
+      const totalAtk=body.attackers.length;
+      treeNodes[bKey]={x:bx,y:by,label:body.name,type:'body',claim,score:body.score,r:9,ctCount,ncCount,totalAtk,bodyData:body};
+      if(treeNodeOverrides[bKey]){treeNodes[bKey].x=treeNodeOverrides[bKey].x;treeNodes[bKey].y=treeNodeOverrides[bKey].y;}
+      minX=Math.min(minX,bx-55);maxX=Math.max(maxX,bx+55);maxY=Math.max(maxY,by);
+      treeEdges.push({from:claimKey,to:bKey,relation:'SUPPORT',score:body.score,isCross:false,isBundle:false});
+      if(treeViewMode==='bundled'){
+        const isExpanded=expandedBodies.has(bKey);
+        if(isExpanded){_addAttackerNodes(body,bKey,bx,Y_ATK,claim,bi,minX,maxX,maxY);}
+        else{
+          if(ctCount>0){const bY=Y_ATK-30;treeEdges.push({from:bKey,to:null,relation:'CONTRARY_TO',isCross:false,isBundle:true,count:ctCount,bx,by,bundleY:bY,label:`${ctCount} CONTRARY_TO`});maxY=Math.max(maxY,bY+20);}
+          if(ncCount>0){const bY=Y_ATK-30+(ctCount>0?25:0);treeEdges.push({from:bKey,to:null,relation:'NOT_CONTRARY',isCross:false,isBundle:true,count:ncCount,bx,by,bundleY:bY,label:`${ncCount} NOT_CONTRARY`});maxY=Math.max(maxY,bY+20);}
+        }
+      } else {
+        const r=_addAttackerNodes(body,bKey,bx,Y_ATK,claim,bi,minX,maxX,maxY);
+        minX=r.minX;maxX=r.maxX;maxY=r.maxY;
+      }
+    });
+    treeBounds[claim]={x:minX,y:Y_CLAIM-30,w:maxX-minX,h:maxY-(Y_CLAIM-30)+60};
+  });
+  buildCrossTreeEdges();buildTreeEdgeIndex();
+  const nN=Object.keys(treeNodes).length;
+  const nE=treeEdges.filter(e=>!e.isBundle).length+treeCrossEdges.length;
+  const nB=treeEdges.filter(e=>e.isBundle).length;
+  const el=document.getElementById('tree-node-count');
+  if(el)el.textContent=treeViewMode==='bundled'?`${nN.toLocaleString()} nodes · ${nB} bundles`:`${nN.toLocaleString()} nodes · ${nE.toLocaleString()} edges`;
+  if(!treeTransformInitialized){treeTransform={x:20,y:20,scale:0.55};treeTransformInitialized=true;}
+}
+function _addAttackerNodes(body,bKey,bx,Y_ATK,claim,bi,minX,maxX,maxY){
+  const attackers=body.attackers||[];
+  const ATK_SPACING=Math.min(65,Math.max(25,130/Math.max(attackers.length,1)));
+  const totalAW=ATK_SPACING*(attackers.length-1),aStartX=bx-totalAW/2;
+  attackers.forEach((atk,ai)=>{
+    const ax=aStartX+ai*ATK_SPACING,ay=Y_ATK,aKey=`atk:${claim}:${bi}:${ai}`;
+    treeNodes[aKey]={x:ax,y:ay,label:atk.name,type:'attacker',relation:atk.relation,claim,r:5,score:atk.score};
+    if(treeNodeOverrides[aKey]){treeNodes[aKey].x=treeNodeOverrides[aKey].x;treeNodes[aKey].y=treeNodeOverrides[aKey].y;}
+    minX=Math.min(minX,ax-40);maxX=Math.max(maxX,ax+40);maxY=Math.max(maxY,ay);
+    treeEdges.push({from:bKey,to:aKey,relation:atk.relation,score:atk.score,isCross:false,isBundle:false});
+  });
+  return{minX,maxX,maxY};
+}
+function buildCrossTreeEdges(){
+  treeCrossEdges=[];
+  const bodyKeyByName={};
+  Object.keys(treeNodes).forEach(key=>{const n=treeNodes[key];if(n.type==='body'){if(!bodyKeyByName[n.label])bodyKeyByName[n.label]=[];bodyKeyByName[n.label].push(key);}});
+  Object.keys(treeNodes).forEach(key=>{const n=treeNodes[key];if(n.type!=='attacker')return;const targets=bodyKeyByName[n.label];if(!targets)return;targets.forEach(tbKey=>{const tb=treeNodes[tbKey];if(tb.claim!==n.claim)treeCrossEdges.push({from:key,to:tbKey,relation:n.relation,score:n.score,isCross:true,isBundle:false});});});
+}
+function buildTreeEdgeIndex(){
+  treeEdgeIdx={out:{},in:{}};
+  [...treeEdges,...treeCrossEdges].filter(e=>!e.isBundle&&e.to).forEach(e=>{
+    if(!treeEdgeIdx.out[e.from])treeEdgeIdx.out[e.from]=[];
+    if(!treeEdgeIdx.in[e.to])treeEdgeIdx.in[e.to]=[];
+    treeEdgeIdx.out[e.from].push(e);treeEdgeIdx.in[e.to].push(e);
+  });
+}
+function toggleBodyExpand(key){
+  if(!key)return;
+  if(expandedBodies.has(key))expandedBodies.delete(key);else expandedBodies.add(key);
+  const n=treeNodes[key];
+  if(n){const btn=document.getElementById('tnp-expand-btn');if(btn)btn.textContent=expandedBodies.has(key)?'▲ Collapse attackers':'▼ Expand attackers';}
+  buildTreeLayout();treeDraw();
+}
+function treeDraw(){treeNeedsRedraw=true;}
+function treeRenderLoop(){if(treeNeedsRedraw&&currentTab==='tree'){treeNeedsRedraw=false;_treeDraw();}requestAnimationFrame(treeRenderLoop);}
+treeRenderLoop();
+function _treeDraw(){
+  const cv=document.getElementById('tree-canvas'),wrap=document.getElementById('tree-canvas-wrap');
+  if(!cv||!wrap||!treeFilteredData)return;
+  const dpr=window.devicePixelRatio||1,W=wrap.offsetWidth,H=wrap.offsetHeight;
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  ctx.save();ctx.translate(treeTransform.x,treeTransform.y);ctx.scale(treeTransform.scale,treeTransform.scale);
+  const nbKeys=new Set();
+  if(treeSelNode){const outs=treeEdgeIdx.out[treeSelNode]||[],ins=treeEdgeIdx.in[treeSelNode]||[];[...outs,...ins].forEach(e=>{nbKeys.add(e.from);nbKeys.add(e.to);});}
+  if(treeSelEdge&&!treeSelEdge.isBundle){if(treeSelEdge.from)nbKeys.add(treeSelEdge.from);if(treeSelEdge.to)nbKeys.add(treeSelEdge.to);}
+  if(treeSelEdge&&treeSelEdge.isBundle){if(treeSelEdge.from)nbKeys.add(treeSelEdge.from);}
+  const hasSel=!!(treeSelNode||treeSelEdge);
+  const inViewT=(x1,y1,x2,y2)=>{const mg=150;const sx1=x1*treeTransform.scale+treeTransform.x,sy1=y1*treeTransform.scale+treeTransform.y,sx2=x2*treeTransform.scale+treeTransform.x,sy2=y2*treeTransform.scale+treeTransform.y;return!((sx1<-mg&&sx2<-mg)||(sx1>W+mg&&sx2>W+mg)||(sy1<-mg&&sy2<-mg)||(sy1>H+mg&&sy2>H+mg));};
+  TREE_CLAIMS.forEach(claim=>{const b=treeBounds[claim];if(!b)return;const cn=treeNodes[`claim:${claim}`];if(!cn)return;ctx.save();ctx.globalAlpha=hasSel?.03:.05;ctx.fillStyle='#98f0c8';ctx.beginPath();if(collapsedTrees.has(claim)){ctx.arc(b.x+b.w/2,b.y+b.h/2,30,0,Math.PI*2);}else{ctx.moveTo(cn.x,b.y);ctx.lineTo(b.x,b.y+b.h);ctx.lineTo(b.x+b.w,b.y+b.h);ctx.closePath();}ctx.fill();ctx.globalAlpha=hasSel?.08:.12;ctx.strokeStyle='#98f0c8';ctx.lineWidth=1;ctx.stroke();ctx.restore();});
+  treeEdges.forEach(e=>{
+    if(e.isBundle){const src=treeNodes[e.from];if(!src)return;const col=edgeColor(e.relation),lw=Math.max(1.5,Math.min(12,1+Math.log2(e.count+1)*2));const isSE=treeSelEdge&&treeSelEdge.isBundle&&treeSelEdge.from===e.from&&treeSelEdge.relation===e.relation;ctx.globalAlpha=isSE?1:hasSel?.06:.5;ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(src.x,src.y);ctx.lineTo(e.bx,e.bundleY);ctx.stroke();if(!hasSel||isSE){ctx.globalAlpha=isSE?1:.7;ctx.font='600 9px Inter,sans-serif';const tw=ctx.measureText(e.label).width;const lx=e.bx-tw/2,ly=e.bundleY+12;ctx.fillStyle=C.bg;ctx.fillRect(lx-2,ly-9,tw+4,11);ctx.fillStyle=col;ctx.fillText(e.label,lx,ly);}ctx.globalAlpha=isSE?1:hasSel?.06:.5;const ang=Math.atan2(e.bundleY-src.y,e.bx-src.x);ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(e.bx,e.bundleY);ctx.lineTo(e.bx-8*Math.cos(ang-.4),e.bundleY-8*Math.sin(ang-.4));ctx.lineTo(e.bx-8*Math.cos(ang+.4),e.bundleY-8*Math.sin(ang+.4));ctx.closePath();ctx.fill();ctx.globalAlpha=1;return;}
+    if(!e.to)return;const src=treeNodes[e.from],tgt=treeNodes[e.to];if(!src||!tgt)return;if(!inViewT(src.x,src.y,tgt.x,tgt.y))return;const col=edgeColor(e.relation);const isSE=treeSelEdge&&!treeSelEdge.isBundle&&treeSelEdge.from===e.from&&treeSelEdge.to===e.to;const isNE=treeSelNode&&(e.from===treeSelNode||e.to===treeSelNode);let alpha=.2,lw=.8;if(isSE){alpha=1;lw=2.5;}else if(isNE){alpha=.85;lw=2;}else if(hasSel){alpha=.04;lw=.5;}ctx.globalAlpha=alpha;ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(src.x,src.y);ctx.lineTo(tgt.x,tgt.y);ctx.stroke();if(isSE||isNE){const ang=Math.atan2(tgt.y-src.y,tgt.x-src.x),mx=(src.x+tgt.x)/2,my=(src.y+tgt.y)/2;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-8*Math.cos(ang-.35),my-8*Math.sin(ang-.35));ctx.lineTo(mx-8*Math.cos(ang+.35),my-8*Math.sin(ang+.35));ctx.closePath();ctx.fill();ctx.globalAlpha=1;ctx.font='600 10px Inter,sans-serif';const tw=ctx.measureText(e.relation).width;ctx.fillStyle=C.bg;ctx.beginPath();ctx.roundRect(mx-tw/2-4,my-18,tw+8,14,3);ctx.fill();ctx.fillStyle=col;ctx.fillText(e.relation,mx-tw/2,my-7);}ctx.globalAlpha=1;
+  });
+  if(treeShowCross){treeCrossEdges.forEach(e=>{const src=treeNodes[e.from],tgt=treeNodes[e.to];if(!src||!tgt)return;if(!inViewT(src.x,src.y,tgt.x,tgt.y))return;const col=edgeColor(e.relation);const isSE=treeSelEdge&&treeSelEdge.isCross&&treeSelEdge.from===e.from&&treeSelEdge.to===e.to;ctx.globalAlpha=isSE?.6:.1;ctx.strokeStyle=col;ctx.lineWidth=isSE?1.5:.5;ctx.setLineDash([5,5]);const mx2=(src.x+tgt.x)/2,my2=(src.y+tgt.y)/2-80;ctx.beginPath();ctx.moveTo(src.x,src.y);ctx.quadraticCurveTo(mx2,my2,tgt.x,tgt.y);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;});}
+  Object.keys(treeNodes).forEach(key=>{
+    const n=treeNodes[key];const isHov=treeHover===key,isSel=treeSelNode===key,isNb=nbKeys.has(key)&&key!==treeSelNode;const dimmed=hasSel&&!isSel&&!isNb,r=n.r||6;
+    ctx.globalAlpha=dimmed?.04:1;
+    if(isSel||isHov){const gr=ctx.createRadialGradient(n.x,n.y,r*.5,n.x,n.y,r+14);gr.addColorStop(0,isSel?'rgba(214,176,76,0.7)':'rgba(214,176,76,0.4)');gr.addColorStop(1,'transparent');ctx.globalAlpha=1;ctx.beginPath();ctx.arc(n.x,n.y,r+14,0,Math.PI*2);ctx.fillStyle=gr;ctx.fill();}
+    if(isNb){const col=n.relation==='CONTRARY_TO'?[255,110,199]:[152,240,200];const gr=ctx.createRadialGradient(n.x,n.y,r*.5,n.x,n.y,r+10);gr.addColorStop(0,`rgba(${col[0]},${col[1]},${col[2]},0.5)`);gr.addColorStop(1,'transparent');ctx.globalAlpha=1;ctx.beginPath();ctx.arc(n.x,n.y,r+10,0,Math.PI*2);ctx.fillStyle=gr;ctx.fill();}
+    ctx.globalAlpha=dimmed?.04:1;ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    if(n.type==='claim'){ctx.fillStyle='rgba(152,240,200,.15)';ctx.strokeStyle='#98f0c8';ctx.lineWidth=2.5;}
+    else if(n.type==='body'){const isExp=expandedBodies.has(key);ctx.fillStyle=isExp?'rgba(207,255,4,.1)':'rgba(214,176,76,.1)';ctx.strokeStyle=isExp?'#cfff04':'#d6b04c';ctx.lineWidth=1.5;}
+    else{const col=n.relation==='CONTRARY_TO'?C.contrary:n.relation==='SUPPORT'?C.support:C.notContrary;ctx.fillStyle='rgba(255,255,255,.03)';ctx.strokeStyle=col;ctx.lineWidth=1;}
+    ctx.fill();ctx.stroke();
+    if(isSel){ctx.beginPath();ctx.arc(n.x,n.y,r+3,0,Math.PI*2);ctx.strokeStyle='#d6b04c';ctx.lineWidth=2;ctx.stroke();}
+    if(n.type==='body'&&treeViewMode==='bundled'&&!dimmed&&n.totalAtk>0){const barW=Math.min(60,r*4),barH=4,barX=n.x-barW/2,barY=n.y+r+4;const ctW=(n.ctCount/n.totalAtk)*barW,ncW=(n.ncCount/n.totalAtk)*barW;ctx.globalAlpha=.8;if(ctW>0){ctx.fillStyle=C.contrary;ctx.beginPath();ctx.roundRect(barX,barY,ctW,barH,2);ctx.fill();}if(ncW>0){ctx.fillStyle=C.notContrary;ctx.beginPath();ctx.roundRect(barX+ctW,barY,ncW,barH,2);ctx.fill();}ctx.globalAlpha=dimmed?.04:1;}
+    const showLabel=n.type==='claim'||n.type==='body'||isHov||isSel||treeTransform.scale>1.5;
+    if(showLabel&&!dimmed){const lbl=n.label.length>26?n.label.slice(0,25)+'…':n.label;ctx.font=n.type==='claim'?'700 12px Inter,sans-serif':n.type==='body'?'500 9px Inter,sans-serif':'400 8px Inter,sans-serif';const tw=ctx.measureText(lbl).width,lx=n.x-tw/2;const ly=n.type==='claim'?n.y-r-8:n.y+r+(n.type==='body'&&treeViewMode==='bundled'?14:11);ctx.globalAlpha=.9;ctx.fillStyle=C.bg;ctx.beginPath();ctx.roundRect(lx-3,ly-10,tw+6,13,3);ctx.fill();ctx.globalAlpha=1;const isExp=expandedBodies.has(key);ctx.fillStyle=n.type==='claim'?'#98f0c8':n.type==='body'?(isExp?'#cfff04':'#d6b04c'):'#8a8d8b';ctx.fillText(lbl,lx,ly);}
+    if(n.type==='claim'){ctx.font='bold 11px Inter,sans-serif';ctx.fillStyle='#98f0c8';ctx.globalAlpha=dimmed?.04:1;ctx.fillText(collapsedTrees.has(n.claim)?'▶':'▼',n.x+r+6,n.y+4);}
+    ctx.globalAlpha=1;
+  });
+  ctx.restore();
+}
+function treeToW(ex,ey){return{x:(ex-treeTransform.x)/treeTransform.scale,y:(ey-treeTransform.y)/treeTransform.scale};}
+function treeNodeAt(mx,my){const{x,y}=treeToW(mx,my);for(const key of Object.keys(treeNodes)){const n=treeNodes[key];if(Math.hypot(n.x-x,n.y-y)<(n.r||6)+8)return key;}return null;}
+function treeBundleEdgeAt(mx,my){const{x,y}=treeToW(mx,my);const thr=Math.max(10,10/treeTransform.scale);for(const e of treeEdges){if(!e.isBundle)continue;const src=treeNodes[e.from];if(!src)continue;const dx=e.bx-src.x,dy=e.bundleY-src.y,len=Math.sqrt(dx*dx+dy*dy)||1;const t=Math.max(0,Math.min(1,((x-src.x)*dx+(y-src.y)*dy)/(len*len)));const px=src.x+t*dx,py=src.y+t*dy;if(Math.hypot(px-x,py-y)<thr)return e;}return null;}
+function treeEdgeAt(mx,my){const{x,y}=treeToW(mx,my);const thr=Math.max(8,8/treeTransform.scale),thrCross=Math.max(16,16/treeTransform.scale);const allE=[...treeEdges.filter(e=>!e.isBundle&&e.to),...(treeShowCross?treeCrossEdges:[])];for(const e of allE){const src=treeNodes[e.from],tgt=treeNodes[e.to];if(!src||!tgt)continue;if(e.isCross){const mx2=(src.x+tgt.x)/2,my2=(src.y+tgt.y)/2-80;for(let s=0;s<=1;s+=.04){const bx=(1-s)*(1-s)*src.x+2*(1-s)*s*mx2+s*s*tgt.x,by=(1-s)*(1-s)*src.y+2*(1-s)*s*my2+s*s*tgt.y;if(Math.hypot(bx-x,by-y)<thrCross)return{...e};}}else{const dx=tgt.x-src.x,dy=tgt.y-src.y,len=Math.sqrt(dx*dx+dy*dy)||1;const s=Math.max(0,Math.min(1,((x-src.x)*dx+(y-src.y)*dy)/(len*len)));const px=src.x+s*dx,py=src.y+s*dy;if(Math.hypot(px-x,py-y)<thr)return{...e};}}return null;}
+const treeCV=document.getElementById('tree-canvas');
+treeCV.addEventListener('mousedown',ev=>{treeMD0={x:ev.offsetX,y:ev.offsetY};const key=treeNodeAt(ev.offsetX,ev.offsetY);if(key){const n=treeNodes[key],{x,y}=treeToW(ev.offsetX,ev.offsetY);if(n.type==='claim'){const off=treeOffsets[n.claim]||{dx:0,dy:0};treeDrag={type:'tree',claim:n.claim,startWX:x,startWY:y,startDx:off.dx,startDy:off.dy};treeCV.style.cursor='move';}else{treeDrag={type:'node',key,startWX:x,startWY:y,startNX:n.x,startNY:n.y};treeCV.style.cursor='grabbing';}}else{treeDrag={type:'pan',sx:ev.offsetX-treeTransform.x,sy:ev.offsetY-treeTransform.y};treeCV.style.cursor='grabbing';}});
+treeCV.addEventListener('mousemove',ev=>{if(treeDrag){if(treeDrag.type==='tree'){const{x,y}=treeToW(ev.offsetX,ev.offsetY);treeOffsets[treeDrag.claim]={dx:treeDrag.startDx+(x-treeDrag.startWX),dy:treeDrag.startDy+(y-treeDrag.startWY)};buildTreeLayout();treeDraw();}else if(treeDrag.type==='node'){const{x,y}=treeToW(ev.offsetX,ev.offsetY);const nx=treeDrag.startNX+(x-treeDrag.startWX),ny=treeDrag.startNY+(y-treeDrag.startWY);if(treeNodes[treeDrag.key]){treeNodes[treeDrag.key].x=nx;treeNodes[treeDrag.key].y=ny;}treeNodeOverrides[treeDrag.key]={x:nx,y:ny};treeDraw();}else{treeTransform.x=ev.offsetX-treeDrag.sx;treeTransform.y=ev.offsetY-treeDrag.sy;treeDraw();}return;}const key=treeNodeAt(ev.offsetX,ev.offsetY);treeHover=key;if(key){treeCV.style.cursor=treeNodes[key]?.type==='claim'?'move':'grab';}else{const onEdge=treeBundleEdgeAt(ev.offsetX,ev.offsetY)||treeEdgeAt(ev.offsetX,ev.offsetY);treeCV.style.cursor=onEdge?'pointer':'grab';}const tip=document.getElementById('tree-tooltip');if(key){const n=treeNodes[key];let typeLabel=n.type==='claim'?'Claim (root — drag to move)':n.type==='body'?'Body (assumption — click to expand)':`Attacker — ${n.relation||''}`;let extra='';if(n.type==='body'&&treeViewMode==='bundled'){extra=`<div class="bundle-bar" style="margin:5px 0"><div class="bundle-seg" style="width:${n.totalAtk?n.ctCount/n.totalAtk*100:0}%;background:${C.contrary};flex:none"></div><div class="bundle-seg" style="width:${n.totalAtk?n.ncCount/n.totalAtk*100:0}%;background:${C.notContrary};flex:none"></div></div><div class="tooltip-row"><span>CONTRARY_TO</span><span class="tooltip-val">${n.ctCount}</span></div><div class="tooltip-row"><span>NOT_CONTRARY</span><span class="tooltip-val">${n.ncCount}</span></div>`;}const scoreRow=n.score!=null?`<div class="tooltip-row"><span>Score</span><span class="tooltip-val">${parseFloat(n.score).toFixed(3)}</span></div>`:'';tip.innerHTML=`<div class="tooltip-head">${n.label}</div><div class="tooltip-row"><span>Type</span><span class="tooltip-val">${typeLabel}</span></div><div class="tooltip-row"><span>Tree</span><span class="tooltip-val">${n.claim}</span></div>${scoreRow}${extra}`;tip.style.left=(ev.offsetX+14)+'px';tip.style.top=(ev.offsetY-10)+'px';tip.classList.add('show');}else{tip.classList.remove('show');}treeDraw();});
+treeCV.addEventListener('mouseup',ev=>{const moved=treeMD0&&(Math.abs(ev.offsetX-treeMD0.x)>5||Math.abs(ev.offsetY-treeMD0.y)>5);const wasTreeDrag=treeDrag&&treeDrag.type==='tree',wasNodeDrag=treeDrag&&treeDrag.type==='node';treeDrag=null;treeCV.style.cursor='grab';if(moved&&(wasTreeDrag||wasNodeDrag)){treeMD0=null;return;}if(!moved){const key=treeNodeAt(ev.offsetX,ev.offsetY);if(key){const n=treeNodes[key];if(n.type==='claim'){if(collapsedTrees.has(n.claim))collapsedTrees.delete(n.claim);else collapsedTrees.add(n.claim);treeSelNode=null;treeSelEdge=null;closeTreeNodePanel();closeTreeEdgePanel();buildTreeLayout();treeDraw();}else if(n.type==='body'&&treeViewMode==='bundled'){treeSelNode=(treeSelNode===key)?null:key;treeSelEdge=null;closeTreeEdgePanel();if(treeSelNode)showTreeNodePanel(key);else closeTreeNodePanel();treeDraw();}else{treeSelNode=(treeSelNode===key)?null:key;treeSelEdge=null;closeTreeEdgePanel();treeSelNode?showTreeNodePanel(key):closeTreeNodePanel();treeDraw();}}else{const bundle=treeViewMode==='bundled'?treeBundleEdgeAt(ev.offsetX,ev.offsetY):null;const edge=bundle||treeEdgeAt(ev.offsetX,ev.offsetY);if(edge){treeSelEdge=edge;treeSelNode=null;closeTreeNodePanel();showTreeEdgePanel(edge);treeDraw();}else{treeSelNode=null;treeSelEdge=null;closeTreeNodePanel();closeTreeEdgePanel();treeDraw();}}}treeMD0=null;});
+treeCV.addEventListener('mouseleave',()=>{treeDrag=null;treeHover=null;document.getElementById('tree-tooltip').classList.remove('show');});
+treeCV.addEventListener('wheel',ev=>{ev.preventDefault();const f=ev.deltaY<0?1.1:.91;treeTransform.x=ev.offsetX-f*(ev.offsetX-treeTransform.x);treeTransform.y=ev.offsetY-f*(ev.offsetY-treeTransform.y);treeTransform.scale=Math.max(.05,Math.min(10,treeTransform.scale*f));treeDraw();},{passive:false});
+function showTreeNodePanel(key){const n=treeNodes[key];if(!n)return;currentPanelBodyKey=key;const outDeg=(treeEdgeIdx.out[key]||[]).length,inDeg=(treeEdgeIdx.in[key]||[]).length;document.getElementById('tnp-name').textContent=n.label;document.getElementById('tnp-type').textContent=n.type==='claim'?'Claim (root)':n.type==='body'?'Body (assumption)':'Attacker';document.getElementById('tnp-claim').textContent=n.claim;document.getElementById('tnp-score').textContent=n.score!=null?parseFloat(n.score).toFixed(4):'—';let connDesc='';if(n.type==='claim')connDesc=`Supports ${outDeg} bodies`;else if(n.type==='body')connDesc=treeViewMode==='bundled'?`${n.totalAtk} attackers (${n.ctCount} contrary · ${n.ncCount} not contrary)`:`${outDeg} attackers`;else connDesc=`Attacks ${inDeg>0?inDeg:1} body`;document.getElementById('tnp-deg').textContent=connDesc;const bundleInfo=document.getElementById('tnp-bundle-info'),expandBtn=document.getElementById('tnp-expand-btn');if(n.type==='body'&&treeViewMode==='bundled'&&n.totalAtk>0){bundleInfo.style.display='block';const total=n.totalAtk,ctW=total?n.ctCount/total*100:0,ncW=total?n.ncCount/total*100:0;document.getElementById('tnp-bundle-bar').innerHTML=`<div class="bundle-seg" style="width:${ctW}%;background:${C.contrary}"></div><div class="bundle-seg" style="width:${ncW}%;background:${C.notContrary}"></div>`;document.getElementById('tnp-bundle-counts').textContent=`${n.ctCount} CONTRARY_TO · ${n.ncCount} NOT_CONTRARY`;expandBtn.style.display='block';expandBtn.textContent=expandedBodies.has(key)?'▲ Collapse attackers':'▼ Expand attackers';}else{bundleInfo.style.display='none';expandBtn.style.display='none';}document.getElementById('tree-node-panel').classList.add('show');}
+function closeTreeNodePanel(){currentPanelBodyKey=null;document.getElementById('tree-node-panel').classList.remove('show');}
+function showTreeEdgePanel(edge){const col=edgeColor(edge.relation);const el=document.getElementById('tep-relation');el.textContent=edge.relation;el.style.color=col;const sn=treeNodes[edge.from],tn=edge.to?treeNodes[edge.to]:null;document.getElementById('tep-source').textContent=sn?sn.label:edge.from;document.getElementById('tep-source').title=sn?sn.label:edge.from;document.getElementById('tep-target').textContent=tn?tn.label:(edge.label||'—');document.getElementById('tep-target').title=tn?tn.label:(edge.label||'—');document.getElementById('tep-score').textContent=edge.score!=null?parseFloat(edge.score).toFixed(4):'—';const bundleRow=document.getElementById('tep-bundle-row');if(edge.isBundle){bundleRow.style.display='flex';document.getElementById('tep-bundle-count').textContent=`${edge.count} individual edges`;}else bundleRow.style.display='none';document.getElementById('tree-edge-panel').classList.add('show');}
+function closeTreeEdgePanel(){treeSelEdge=null;document.getElementById('tree-edge-panel').classList.remove('show');treeDraw();}
+function treeZoomBy(f){const wrap=document.getElementById('tree-canvas-wrap');const cx=wrap.offsetWidth/2,cy=wrap.offsetHeight/2;treeTransform.x=cx-f*(cx-treeTransform.x);treeTransform.y=cy-f*(cy-treeTransform.y);treeTransform.scale=Math.max(.05,Math.min(10,treeTransform.scale*f));treeDraw();}
+function resetTreeView(){collapsedTrees.clear();expandedBodies.clear();treeOffsets={};treeNodeOverrides={};treeTransformInitialized=false;treeSelNode=null;treeSelEdge=null;closeTreeNodePanel();closeTreeEdgePanel();buildTreeLayout();treeDraw();}
+function toggleCrossTree(){treeShowCross=!treeShowCross;document.getElementById('btn-cross').classList.toggle('active',treeShowCross);treeDraw();}
+window.addEventListener('resize',()=>{if(currentTab==='graph'&&G.nodes.length)draw();if(currentTab==='tree'&&treeFilteredData){buildTreeLayout();treeDraw();}});
+switchTab('graph');
+</script>
+</body>
+</html>
