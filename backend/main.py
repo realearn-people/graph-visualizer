@@ -1,7 +1,6 @@
 """
 KGE Visualization Backend
 FastAPI server — serves graph data and ABA tree structure
-Claude-Assisted
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
